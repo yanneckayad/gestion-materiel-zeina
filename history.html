@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historique - La Lumière de l'Ange Zeïna</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+
+<!-- Barre de navigation -->
+<nav class="bg-slate-800 p-4 shadow-md flex justify-between items-center">
+    <a href="dashboard.html" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition">
+        ← Retour au registre
+    </a>
+    <div class="font-bold text-xl">Fiche Historique</div>
+</nav>
+
+<!-- Contenu principal -->
+<main class="p-8 max-w-3xl mx-auto">
+
+    <!-- En-tête du matériel -->
+    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8">
+        <h1 id="item-title" class="text-3xl font-bold mb-2">Chargement...</h1>
+        <p id="item-ref" class="text-slate-400 text-lg"></p>
+    </div>
+
+    <h2 class="text-xl font-bold mb-6 border-b border-slate-700 pb-2">Chronologie des mouvements</h2>
+
+    <!-- La chronologie s'affichera ici -->
+    <div id="timeline" class="space-y-6 border-l-2 border-slate-700 ml-4 pl-6 relative">
+        <p class="text-slate-400">Récupération de l'historique...</p>
+    </div>
+
+</main>
+
+<!-- Script JavaScript -->
+<script type="module" src="js/history.js"></script>
+</body>
+</html>
