@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyA5RLJI5ahBhZKGQNLXCFWIEnRxx0MNN44",
@@ -15,14 +15,14 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Version 2.9 (Mise à jour silencieuse)
-const APP_VERSION = "2.9";
+// Version 3.1
+const APP_VERSION = "3.1";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
     localStorage.setItem("zeina_version", APP_VERSION);
-    console.log("Mise à jour vers la version " + APP_VERSION);
+    console.log("Mise à jour silencieuse vers la version " + APP_VERSION);
 }
 
 onAuthStateChanged(auth, (user) => {
@@ -47,22 +47,27 @@ document.getElementById('report-form').addEventListener('submit', async (e) => {
 
 let currentAllEvents = [];
 let currentStats = { prets: 0, retours: 0, dons: 0, ajouts: 0 };
+let isGenerating = false;
 
 async function generateReport() {
-    const startInput = document.getElementById('date-debut').value;
-    const endInput = document.getElementById('date-fin').value;
-
-    const startDate = new Date(startInput);
-    startDate.setHours(0, 0, 0, 0);
-
-    const endDate = new Date(endInput);
-    endDate.setHours(23, 59, 59, 999);
+    if (isGenerating) return;
+    isGenerating = true;
 
     const submitBtn = document.querySelector('#report-form button');
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calcul...';
+    const pdfBtn = document.getElementById('btn-download-pdf');
+    const printBtn = document.getElementById('btn-print');
+
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyse...';
     submitBtn.disabled = true;
+    if(pdfBtn) pdfBtn.disabled = true;
+    if(printBtn) printBtn.disabled = true;
 
     try {
+        const startDate = new Date(document.getElementById('date-debut').value);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(document.getElementById('date-fin').value);
+        endDate.setHours(23, 59, 59, 999);
+
         const materielMap = {};
         const materielSnap = await getDocs(collection(db, "materiel"));
         materielSnap.forEach(doc => materielMap[doc.id] = doc.data().nom);
@@ -74,59 +79,53 @@ async function generateReport() {
         currentAllEvents = [];
         currentStats = { prets: 0, retours: 0, dons: 0, ajouts: 0 };
 
-        const pretsSnap = await getDocs(collection(db, "prets"));
+        const qPrets = query(collection(db, "prets"), where("datePret", ">=", startDate), where("datePret", "<=", endDate));
+        const pretsSnap = await getDocs(qPrets);
         pretsSnap.forEach(doc => {
             const data = doc.data();
-            const eventDate = data.datePret.toDate();
-            if (eventDate >= startDate && eventDate <= endDate) {
-                currentStats.prets++;
-                currentAllEvents.push({
-                    date: eventDate, category: 'materiel', itemId: data.materielId, type: 'pret',
-                    titre: `Prêt : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
-                    desc: `Au patient : ${data.patientNom} | Par : ${data.membreEmail}`,
-                    icon: 'fa-hand-holding-heart', color: 'text-blue-400', bg: 'bg-blue-900'
-                });
-            }
+            currentStats.prets++;
+            currentAllEvents.push({
+                date: data.datePret.toDate(), category: 'materiel', itemId: data.materielId, type: 'Prêt',
+                titre: `Prêt : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
+                desc: `Au patient : ${data.patientNom} | Par : ${data.membreEmail}`,
+                icon: 'fa-hand-holding-heart', color: 'text-blue-400', bg: 'bg-blue-900'
+            });
         });
 
-        const retoursSnap = await getDocs(collection(db, "retours"));
+        const qRetours = query(collection(db, "retours"), where("dateRetour", ">=", startDate), where("dateRetour", "<=", endDate));
+        const retoursSnap = await getDocs(qRetours);
         retoursSnap.forEach(doc => {
             const data = doc.data();
-            const eventDate = data.dateRetour.toDate();
-            if (eventDate >= startDate && eventDate <= endDate) {
-                currentStats.retours++;
-                currentAllEvents.push({
-                    date: eventDate, category: 'materiel', itemId: data.materielId, type: 'retour',
-                    titre: `Retour : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
-                    desc: `Validé par : ${data.membreEmail}`,
-                    icon: 'fa-boxes-packing', color: 'text-emerald-400', bg: 'bg-emerald-900'
-                });
-            }
+            currentStats.retours++;
+            currentAllEvents.push({
+                date: data.dateRetour.toDate(), category: 'materiel', itemId: data.materielId, type: 'Retour',
+                titre: `Retour : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
+                desc: `Validé par : ${data.membreEmail}`,
+                icon: 'fa-boxes-packing', color: 'text-emerald-400', bg: 'bg-emerald-900'
+            });
         });
 
-        const medHistSnap = await getDocs(collection(db, "historique_medicaments"));
+        const qMeds = query(collection(db, "historique_medicaments"), where("date", ">=", startDate), where("date", "<=", endDate));
+        const medHistSnap = await getDocs(qMeds);
         medHistSnap.forEach(doc => {
             const data = doc.data();
-            const eventDate = data.date.toDate();
-            if (eventDate >= startDate && eventDate <= endDate) {
-                const medName = medMap[data.medicamentId] || 'Médicament supprimé';
-                if (data.type === "distribution") {
-                    currentStats.dons += data.quantite;
-                    currentAllEvents.push({
-                        date: eventDate, category: 'medicament', itemId: data.medicamentId, type: 'don',
-                        titre: `Don : ${medName} (-${data.quantite} boîte(s))`,
-                        desc: `Au patient : ${data.beneficiaire} | Par : ${data.membreEmail}`,
-                        icon: 'fa-pills', color: 'text-amber-400', bg: 'bg-amber-900'
-                    });
-                } else if (data.type === "ajout_stock") {
-                    currentStats.ajouts += data.quantite;
-                    currentAllEvents.push({
-                        date: eventDate, category: 'medicament', itemId: data.medicamentId, type: 'ajout',
-                        titre: `Ajout Stock : ${medName} (+${data.quantite} boîte(s))`,
-                        desc: `Réceptionné par : ${data.membreEmail}`,
-                        icon: 'fa-boxes-stacked', color: 'text-purple-400', bg: 'bg-purple-900'
-                    });
-                }
+            const medName = medMap[data.medicamentId] || 'Médicament supprimé';
+            if (data.type === "distribution") {
+                currentStats.dons += data.quantite;
+                currentAllEvents.push({
+                    date: data.date.toDate(), category: 'medicament', itemId: data.medicamentId, type: 'Don',
+                    titre: `Don : ${medName} (-${data.quantite} boîte(s))`,
+                    desc: `Au patient : ${data.beneficiaire} | Par : ${data.membreEmail}`,
+                    icon: 'fa-pills', color: 'text-amber-400', bg: 'bg-amber-900'
+                });
+            } else if (data.type === "ajout_stock") {
+                currentStats.ajouts += data.quantite;
+                currentAllEvents.push({
+                    date: data.date.toDate(), category: 'medicament', itemId: data.medicamentId, type: 'Stock',
+                    titre: `Ajout Stock : ${medName} (+${data.quantite} boîte(s))`,
+                    desc: `Réceptionné par : ${data.membreEmail}`,
+                    icon: 'fa-boxes-stacked', color: 'text-purple-400', bg: 'bg-purple-900'
+                });
             }
         });
 
@@ -169,110 +168,110 @@ async function generateReport() {
         }
 
     } catch (error) {
-        alert("Erreur lors de la génération : " + error.message);
+        alert("Erreur lors de l'analyse : " + error.message);
     } finally {
+        isGenerating = false;
         submitBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Analyser';
         submitBtn.disabled = false;
+        if(pdfBtn) pdfBtn.disabled = false;
+        if(printBtn) printBtn.disabled = false;
     }
 }
 
+
 // =========================================================================
-// MOTEUR PDF INFAILLIBLE : jsPDF + autoTable (Aucun blocage, Génération en 0.1s)
+// MOTEUR PDF CENTRALISÉ (Pour le Téléchargement ET l'Impression)
 // =========================================================================
-const btnDownloadPdf = document.getElementById('btn-download-pdf');
-if(btnDownloadPdf) {
-    btnDownloadPdf.addEventListener('click', () => {
-        const btn = document.getElementById('btn-download-pdf');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Création...';
-        btn.disabled = true;
+function buildPdfDocument() {
+    if (!window.jspdf) {
+        alert("Erreur : La librairie PDF n'est pas chargée.");
+        return null;
+    }
 
-        try {
-            if (!window.jspdf) {
-                alert("Erreur : La librairie PDF n'est pas chargée. Veuillez mettre à jour rapport.html.");
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-                return;
-            }
+    const startStr = document.getElementById('date-debut').value;
+    const endStr = document.getElementById('date-fin').value;
 
-            const startStr = document.getElementById('date-debut').value;
-            const endStr = document.getElementById('date-fin').value;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
 
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.setTextColor(37, 99, 235);
+    doc.text("La Lumiere de l'Ange Zeina", 14, 20);
 
-            // En-tête du PDF
-            doc.setFontSize(22);
-            doc.setTextColor(37, 99, 235); // Bleu Zeïna
-            doc.text("La Lumiere de l'Ange Zeina", 14, 20);
+    doc.setFontSize(14);
+    doc.setTextColor(71, 85, 105);
+    doc.text("Rapport d'activite detaille", 14, 28);
 
-            doc.setFontSize(14);
-            doc.setTextColor(71, 85, 105);
-            doc.text("Rapport d'activite detaille", 14, 28);
+    doc.setFontSize(10);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Periode du ${startStr} au ${endStr}`, 14, 34);
 
-            doc.setFontSize(10);
+    doc.setDrawColor(226, 232, 240);
+    doc.line(14, 38, 196, 38);
+
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Prets : ${currentStats.prets}  |  Retours : ${currentStats.retours}  |  Dons : ${currentStats.dons}  |  Stock : ${currentStats.ajouts}`, 14, 46);
+
+    const tableData = currentAllEvents.map(ev => {
+        const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return [
+            dateStr,
+            ev.type.toUpperCase(),
+            ev.titre,
+            ev.desc.replace(' | ', '\n')
+        ];
+    });
+
+    if (tableData.length === 0) {
+        tableData.push(["-", "-", "Aucune operation", "-"]);
+    }
+
+    doc.autoTable({
+        startY: 52,
+        head: [['Date', 'Action', 'Objet', 'Details']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+            0: { cellWidth: 28, fontStyle: 'bold' },
+            1: { cellWidth: 22, fontStyle: 'bold', textColor: [37, 99, 235] },
+            2: { cellWidth: 65, fontStyle: 'bold', textColor: [15, 23, 42] },
+            3: { cellWidth: 'auto' }
+        },
+        didDrawPage: function (data) {
+            doc.setFontSize(8);
             doc.setTextColor(148, 163, 184);
-            doc.text(`Periode du ${startStr} au ${endStr}`, 14, 34);
+            doc.text('Genere le ' + new Date().toLocaleString('fr-FR') + ' par l\'application Zeina', data.settings.margin.left, doc.internal.pageSize.height - 10);
+        }
+    });
 
-            // Ligne de séparation
-            doc.setDrawColor(226, 232, 240);
-            doc.line(14, 38, 196, 38);
+    return { doc, startStr, endStr };
+}
 
-            // Chiffres Clés (Statistiques)
-            doc.setFontSize(11);
-            doc.setTextColor(15, 23, 42);
-            doc.text(`Prets : ${currentStats.prets}  |  Retours : ${currentStats.retours}  |  Dons : ${currentStats.dons}  |  Ajouts Stock : ${currentStats.ajouts}`, 14, 46);
+// Action 1 : Télécharger
+const btnDownloadPdf = document.getElementById('btn-download-pdf');
+if (btnDownloadPdf) {
+    btnDownloadPdf.addEventListener('click', () => {
+        const result = buildPdfDocument();
+        if (result) {
+            result.doc.save(`Zeina_Rapport_${result.startStr}_au_${result.endStr}.pdf`);
+        }
+    });
+}
 
-            // Préparation des données du journal
-            const tableData = currentAllEvents.map(ev => {
-                const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-                // Nettoyage des caractères spéciaux pour une police standard
-                let action = ev.type.toUpperCase();
-                let titre = ev.titre.replace(/Prêt/g, 'Pret').replace(/Médicament/g, 'Medicament').replace(/Boîte/g, 'Boite').replace(/boîte/g, 'boite');
-                let desc = ev.desc.replace(' | ', '\n').replace(/Bénéficiaire/g, 'Beneficiaire').replace(/Réceptionné/g, 'Receptionne');
-
-                return [dateStr, action, titre, desc];
-            });
-
-            if (tableData.length === 0) {
-                tableData.push(["-", "-", "Aucune operation sur cette periode", "-"]);
-            }
-
-            // Génération du tableau (autoTable gère tout le formatage proprement)
-            if (doc.autoTable) {
-                doc.autoTable({
-                    startY: 52,
-                    head: [['Date', 'Action', 'Objet', 'Details']],
-                    body: tableData,
-                    theme: 'striped',
-                    headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
-                    styles: { fontSize: 9, cellPadding: 4, valign: 'middle' },
-                    columnStyles: {
-                        0: { cellWidth: 28 },
-                        1: { cellWidth: 22 },
-                        2: { cellWidth: 65 },
-                        3: { cellWidth: 'auto' }
-                    },
-                    didDrawPage: function (data) {
-                        doc.setFontSize(8);
-                        doc.setTextColor(148, 163, 184);
-                        doc.text('Genere le ' + new Date().toLocaleString('fr-FR') + ' par l\'application Zeina', data.settings.margin.left, doc.internal.pageSize.height - 10);
-                    }
-                });
-            } else {
-                doc.text("Module tableau manquant.", 14, 60);
-            }
-
-            // Téléchargement du PDF
-            doc.save(`Zeina_Rapport_${startStr}_au_${endStr}.pdf`);
-
-        } catch (error) {
-            console.error("Erreur PDF :", error);
-            alert("Erreur : " + error.message);
-        } finally {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+// Action 2 : Imprimer instantanément (Remplace le bug du navigateur)
+const btnPrint = document.getElementById('btn-print');
+if (btnPrint) {
+    btnPrint.addEventListener('click', () => {
+        const result = buildPdfDocument();
+        if (result) {
+            // Demande au PDF de lancer directement l'impression à l'ouverture
+            result.doc.autoPrint();
+            // Ouvre le PDF dans un nouvel onglet, prêt à être imprimé !
+            window.open(result.doc.output('bloburl'), '_blank');
         }
     });
 }
