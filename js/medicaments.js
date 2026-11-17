@@ -23,7 +23,7 @@ let allMeds = [];
 let searchQuery = "";
 let currentFilter = "all";
 let currentMedId = null;
-let currentMedMaxStock = 0;
+let currentMedLots = []; // Stocke les lots du médicament sélectionné
 let scannedBarcodeValue = "";
 
 document.getElementById('logout-btn').addEventListener('click', () => {
@@ -37,10 +37,11 @@ document.getElementById('search-med').addEventListener('input', (e) => {
 
 const btnAll = document.getElementById('filter-all');
 const btnStock = document.getElementById('filter-stock');
+const btnExpiring = document.getElementById('filter-expiring');
 const btnRupture = document.getElementById('filter-rupture');
 
 function updateFilterUI(activeBtn) {
-    [btnAll, btnStock, btnRupture].forEach(btn => {
+    [btnAll, btnStock, btnExpiring, btnRupture].forEach(btn => {
         btn.classList.remove('bg-slate-700', 'text-white', 'shadow-md');
         btn.classList.add('text-slate-400');
     });
@@ -50,6 +51,7 @@ function updateFilterUI(activeBtn) {
 
 btnAll.addEventListener('click', () => { currentFilter = "all"; updateFilterUI(btnAll); renderMeds(); });
 btnStock.addEventListener('click', () => { currentFilter = "stock"; updateFilterUI(btnStock); renderMeds(); });
+btnExpiring.addEventListener('click', () => { currentFilter = "expiring"; updateFilterUI(btnExpiring); renderMeds(); });
 btnRupture.addEventListener('click', () => { currentFilter = "rupture"; updateFilterUI(btnRupture); renderMeds(); });
 
 async function uploadToCloudinary(file) {
@@ -61,7 +63,21 @@ async function uploadToCloudinary(file) {
     return data.secure_url;
 }
 
-// Ajout classique via le formulaire de gauche
+// Fonction de rétrocompatibilité pour extraire les lots propres
+function extractLots(data) {
+    let lots = data.lots || [];
+    let qteTotale = data.quantiteTotale ?? data.quantite ?? 0;
+
+    // Si c'est un vieil enregistrement, on le convertit virtuellement en lot unique
+    if (lots.length === 0 && data.dateExpiration && qteTotale > 0) {
+        lots = [{ quantite: qteTotale, dateExpiration: data.dateExpiration }];
+    }
+
+    // Tri par date d'expiration (FEFO) : le plus urgent en premier
+    lots.sort((a, b) => new Date(a.dateExpiration) - new Date(b.dateExpiration));
+    return { lots, qteTotale };
+}
+
 const addMedForm = document.getElementById('add-med-form');
 addMedForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -82,8 +98,9 @@ addMedForm.addEventListener('submit', async (e) => {
 
         const medRef = await addDoc(collection(db, "medicaments"), {
             nom: name,
-            quantite: stock,
-            dateExpiration: expDate,
+            quantiteTotale: stock,
+            quantite: stock, // Gardé pour sécurité
+            lots: [{ quantite: stock, dateExpiration: expDate }],
             photo: imageUrl,
             codeBarre: "",
             dateAjout: new Date()
@@ -98,7 +115,7 @@ addMedForm.addEventListener('submit', async (e) => {
         });
 
         addMedForm.reset();
-        alert("Médicament ajouté avec succès !");
+        alert("Médicament et lot ajoutés avec succès !");
     } catch (error) {
         alert("Erreur : " + error.message);
     } finally {
@@ -107,7 +124,6 @@ addMedForm.addEventListener('submit', async (e) => {
     }
 });
 
-// --- LOGIQUE DU SCANNER DE CODE-BARRES ---
 let html5BarcodeScanner;
 const barcodeModal = document.getElementById('barcode-modal');
 const newMedModal = document.getElementById('new-med-modal');
@@ -119,12 +135,9 @@ document.getElementById('btn-scan-barcode').addEventListener('click', () => {
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 280, height: 150 } },
         async (decodedText) => {
-            // Succès du scan du code-barres
             await html5BarcodeScanner.stop();
             barcodeModal.classList.add('hidden');
             scannedBarcodeValue = decodedText;
-
-            // Vérifier si le code-barres existe déjà dans Firestore
             await verifierCodeBarre(decodedText);
         },
         (errorMessage) => {}
@@ -142,23 +155,21 @@ document.getElementById('close-barcode-modal').addEventListener('click', () => {
     }
 });
 
-// Vérification si le médicament existe déjà par son code-barres
 async function verifierCodeBarre(code) {
     try {
         const q = query(collection(db, "medicaments"), where("codeBarre", "==", code));
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-            // Cas 1 : Il existe déjà ! On isole le médicament dans la recherche
             const docSnap = querySnapshot.docs[0];
             const medData = docSnap.data();
 
             document.getElementById('search-med').value = medData.nom;
             searchQuery = medData.nom.toLowerCase();
             renderMeds();
-            alert(`Médicament reconnu : "${medData.nom}" (Stock : ${medData.quantite} boîtes)`);
+            const qte = extractLots(medData).qteTotale;
+            alert(`Médicament reconnu : "${medData.nom}" (Stock : ${qte} boîtes)`);
         } else {
-            // Cas 2 : Inexistant, on ouvre la modale d'enregistrement
             document.getElementById('scanned-code-display').textContent = `Code-barres scanné : ${code}`;
             document.getElementById('scanned-med-name').value = "";
             document.getElementById('scanned-med-stock').value = 1;
@@ -171,11 +182,9 @@ async function verifierCodeBarre(code) {
     }
 }
 
-// Fermeture de la modale nouveau médicament scanné
 document.getElementById('close-new-med-modal').addEventListener('click', () => newMedModal.classList.add('hidden'));
 document.getElementById('cancel-new-med').addEventListener('click', () => newMedModal.classList.add('hidden'));
 
-// Enregistrement du nouveau médicament depuis le scan
 document.getElementById('new-scanned-med-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('scanned-med-name').value;
@@ -191,10 +200,11 @@ document.getElementById('new-scanned-med-form').addEventListener('submit', async
 
         const medRef = await addDoc(collection(db, "medicaments"), {
             nom: name,
+            quantiteTotale: stock,
             quantite: stock,
-            dateExpiration: expDate,
+            lots: [{ quantite: stock, dateExpiration: expDate }],
             photo: imageUrl,
-            codeBarre: scannedBarcodeValue, // On associe le code-barres scanné
+            codeBarre: scannedBarcodeValue,
             dateAjout: new Date()
         });
 
@@ -218,13 +228,24 @@ const medListEl = document.getElementById('med-list');
 
 function renderMeds() {
     medListEl.innerHTML = "";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const filtered = allMeds.filter(item => {
+        const { lots, qteTotale } = extractLots(item.data);
         const matchesSearch = item.data.nom.toLowerCase().includes(searchQuery);
-        const isRupture = item.data.quantite === 0;
+        const isRupture = qteTotale === 0;
+
+        let isExpiringSoon = false;
+        if (lots.length > 0) {
+            const expDate = new Date(lots[0].dateExpiration); // Le lot le plus urgent
+            const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0 && diffDays <= 90) isExpiringSoon = true;
+        }
 
         if (currentFilter === "stock" && isRupture) return false;
         if (currentFilter === "rupture" && !isRupture) return false;
+        if (currentFilter === "expiring" && !isExpiringSoon) return false;
 
         return matchesSearch;
     });
@@ -234,33 +255,34 @@ function renderMeds() {
         return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     filtered.forEach((item) => {
         const data = item.data;
         const id = item.id;
-
-        const expDate = new Date(data.dateExpiration);
-        const diffTime = expDate - today;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const { lots, qteTotale } = extractLots(data);
 
         let badgeHtml = '';
-        if (data.quantite === 0) {
+        if (qteTotale === 0) {
             badgeHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20"><i class="fa-solid fa-circle-xmark mr-1"></i> Rupture de stock</span>`;
-        } else if (diffDays < 0) {
-            badgeHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Périmé !</span>`;
-        } else if (diffDays <= 90) {
-            badgeHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"><i class="fa-solid fa-clock mr-1"></i>Expire (${diffDays}j)</span>`;
-        } else {
-            badgeHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-circle-check mr-1"></i> En stock</span>`;
+        } else if (lots.length > 0) {
+            const expDate = new Date(lots[0].dateExpiration);
+            const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+            if (diffDays < 0) {
+                badgeHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Périmé !</span>`;
+            } else if (diffDays <= 90) {
+                badgeHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"><i class="fa-solid fa-clock mr-1"></i>Urgent (${diffDays}j)</span>`;
+            } else {
+                badgeHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-circle-check mr-1"></i> Bon état</span>`;
+            }
         }
+
+        // Affichage visuel des lots
+        const lotsHtml = lots.map(l => `<span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 font-mono text-[10px]">${l.quantite}x Exp: ${l.dateExpiration}</span>`).join(' ');
 
         const card = document.createElement('div');
         card.className = "bg-slate-900/40 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-slate-700/50 hover:border-slate-500 transition-all";
         card.innerHTML = `
             <div class="flex items-center gap-4">
-                <div class="w-16 h-16 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                <div class="w-16 h-16 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 shadow-md">
                     <img src="${data.photo}" alt="Boîte" class="w-full h-full object-cover">
                 </div>
                 <div>
@@ -268,13 +290,16 @@ function renderMeds() {
                         ${data.nom} <i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
                     </a>
                     <div class="flex items-center gap-2 mt-1 flex-wrap">
-                        <span class="text-sm font-mono text-slate-300 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">Stock : <strong>${data.quantite}</strong> boîtes</span>
+                        <span class="text-sm font-mono text-white bg-blue-600/20 px-2 py-0.5 rounded border border-blue-500/30">Total : <strong>${qteTotale}</strong></span>
                         ${badgeHtml}
+                    </div>
+                    <div class="flex gap-1 mt-2 flex-wrap">
+                        ${lotsHtml}
                     </div>
                 </div>
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                <button class="btn-give bg-emerald-600/25 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5" data-id="${id}" data-nom="${data.nom}" data-stock="${data.quantite}">
+                <button class="btn-give bg-emerald-600/25 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5" data-id="${id}" data-nom="${data.nom}">
                     <i class="fa-solid fa-hand-holding-medical pointer-events-none"></i> Donner
                 </button>
                 <button class="btn-restock bg-blue-600/25 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5" data-id="${id}" data-nom="${data.nom}">
@@ -287,18 +312,52 @@ function renderMeds() {
     });
 
     document.querySelectorAll('.btn-give').forEach(button => {
-        button.addEventListener('click', (e) => {
+        button.addEventListener('click', async (e) => {
             currentMedId = e.target.getAttribute('data-id');
-            currentMedMaxStock = parseInt(e.target.getAttribute('data-stock'));
-            document.getElementById('give-med-name').textContent = e.target.getAttribute('data-nom');
-            document.getElementById('give-med-stock-info').textContent = `Stock disponible : ${currentMedMaxStock} boîte(s)`;
+            const nom = e.target.getAttribute('data-nom');
+
+            // On récupère la donnée la plus fraîche
+            const medDoc = await getDoc(doc(db, "medicaments", currentMedId));
+            const { lots, qteTotale } = extractLots(medDoc.data());
+            currentMedLots = lots;
+
+            if (qteTotale === 0 || lots.length === 0) {
+                return alert("Ce médicament est en rupture totale de stock.");
+            }
+
+            document.getElementById('give-med-name').textContent = nom;
+            document.getElementById('give-med-stock-info').textContent = `Total disponible : ${qteTotale} boîte(s)`;
             document.getElementById('give-quantity').value = 1;
             document.getElementById('give-beneficiary').value = "";
+
+            // Remplir le menu déroulant des lots (FEFO)
+            const lotSelect = document.getElementById('give-lot-select');
+            lotSelect.innerHTML = "";
+            lots.forEach((lot, index) => {
+                const opt = document.createElement('option');
+                opt.value = lot.dateExpiration;
+                let text = `Lot Exp: ${lot.dateExpiration} (${lot.quantite} dispo)`;
+                if(index === 0) text = "🔴 URGENT: " + text;
+                opt.textContent = text;
+                lotSelect.appendChild(opt);
+            });
+
             document.getElementById('give-med-modal').classList.remove('hidden');
+        });
+    });
+
+    document.querySelectorAll('.btn-restock').forEach(button => {
+        button.addEventListener('click', (e) => {
+            currentMedId = e.target.getAttribute('data-id');
+            document.getElementById('restock-med-name').textContent = e.target.getAttribute('data-nom');
+            document.getElementById('restock-quantity').value = 1;
+            document.getElementById('restock-exp').value = "";
+            document.getElementById('restock-modal').classList.remove('hidden');
         });
     });
 }
 
+// Validation de la modale de Don
 const giveModal = document.getElementById('give-med-modal');
 document.getElementById('close-give-modal').addEventListener('click', () => giveModal.classList.add('hidden'));
 document.getElementById('cancel-give-btn').addEventListener('click', () => giveModal.classList.add('hidden'));
@@ -307,12 +366,31 @@ document.getElementById('give-med-form').addEventListener('submit', async (e) =>
     e.preventDefault();
     const qtyToGive = parseInt(document.getElementById('give-quantity').value);
     const beneficiary = document.getElementById('give-beneficiary').value;
-
-    if (qtyToGive > currentMedMaxStock) return alert("Erreur : Pas assez de stock !");
+    const selectedExpDate = document.getElementById('give-lot-select').value;
 
     try {
-        const newStock = currentMedMaxStock - qtyToGive;
-        await updateDoc(doc(db, "medicaments", currentMedId), { quantite: newStock });
+        const medDoc = await getDoc(doc(db, "medicaments", currentMedId));
+        let { lots, qteTotale } = extractLots(medDoc.data());
+
+        let lotIndex = lots.findIndex(l => l.dateExpiration === selectedExpDate);
+
+        if (lotIndex === -1 || lots[lotIndex].quantite < qtyToGive) {
+            return alert("Erreur : Ce lot ne contient pas assez de boîtes !");
+        }
+
+        lots[lotIndex].quantite -= qtyToGive;
+        qteTotale -= qtyToGive;
+
+        // Nettoyer les lots vides
+        if (lots[lotIndex].quantite === 0) {
+            lots.splice(lotIndex, 1);
+        }
+
+        await updateDoc(doc(db, "medicaments", currentMedId), {
+            lots: lots,
+            quantiteTotale: qteTotale,
+            quantite: qteTotale
+        });
 
         await addDoc(collection(db, "historique_medicaments"), {
             medicamentId: currentMedId,
@@ -323,48 +401,60 @@ document.getElementById('give-med-form').addEventListener('submit', async (e) =>
             date: new Date()
         });
 
-        alert(`Don de ${qtyToGive} boîte(s) enregistré avec succès !`);
+        alert(`Don de ${qtyToGive} boîte(s) validé !`);
         giveModal.classList.add('hidden');
     } catch (error) {
         alert("Erreur : " + error.message);
     }
 });
 
-document.addEventListener('click', async (e) => {
-    if (e.target.classList.contains('btn-restock')) {
-        const id = e.target.getAttribute('data-id');
-        const nom = e.target.getAttribute('data-nom');
+// Validation de la modale d'Ajout de Stock (+ Stock)
+const restockModal = document.getElementById('restock-modal');
+document.getElementById('close-restock-modal').addEventListener('click', () => restockModal.classList.add('hidden'));
+document.getElementById('cancel-restock-btn').addEventListener('click', () => restockModal.classList.add('hidden'));
 
-        const saisie = prompt(`Combien de boîtes de "${nom}" souhaitez-vous ajouter au stock ?`, "30");
-        if (!saisie) return;
+document.getElementById('restock-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const qty = parseInt(document.getElementById('restock-quantity').value);
+    const expDate = document.getElementById('restock-exp').value;
 
-        const qtéAjoutee = parseInt(saisie);
-        if (isNaN(qtéAjoutee) || qtéAjoutee <= 0) return alert("Nombre invalide.");
+    try {
+        const medDoc = await getDoc(doc(db, "medicaments", currentMedId));
+        let { lots, qteTotale } = extractLots(medDoc.data());
 
-        try {
-            const medDoc = await getDoc(doc(db, "medicaments", id));
-            if (medDoc.exists()) {
-                const nouveauStock = medDoc.data().quantite + qtéAjoutee;
-                await updateDoc(doc(db, "medicaments", id), { quantite: nouveauStock });
-
-                await addDoc(collection(db, "historique_medicaments"), {
-                    medicamentId: id,
-                    type: "ajout_stock",
-                    quantite: qtéAjoutee,
-                    membreEmail: auth.currentUser ? auth.currentUser.email : "Inconnu",
-                    date: new Date()
-                });
-
-                alert(`Succès ! +${qtéAjoutee} boîtes ajoutées à ${nom}.`);
-            }
-        } catch (error) {
-            alert("Erreur : " + error.message);
+        // Vérifier si un lot avec la même date existe déjà
+        let existingLot = lots.find(l => l.dateExpiration === expDate);
+        if (existingLot) {
+            existingLot.quantite += qty;
+        } else {
+            lots.push({ quantite: qty, dateExpiration: expDate });
         }
+
+        qteTotale += qty;
+
+        await updateDoc(doc(db, "medicaments", currentMedId), {
+            lots: lots,
+            quantiteTotale: qteTotale,
+            quantite: qteTotale
+        });
+
+        await addDoc(collection(db, "historique_medicaments"), {
+            medicamentId: currentMedId,
+            type: "ajout_stock",
+            quantite: qty,
+            membreEmail: auth.currentUser ? auth.currentUser.email : "Inconnu",
+            date: new Date()
+        });
+
+        alert(`Le stock a été mis à jour (+${qty} boîtes).`);
+        restockModal.classList.add('hidden');
+    } catch (error) {
+        alert("Erreur : " + error.message);
     }
 });
 
 window.deleteMed = async function(id) {
-    if (confirm("Supprimer ce médicament ?")) {
+    if (confirm("Supprimer intégralement ce médicament et tous ses lots ?")) {
         await deleteDoc(doc(db, "medicaments", id));
     }
 };
