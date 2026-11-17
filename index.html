@@ -1,5 +1,12 @@
 <!DOCTYPE html>
 <html lang="fr">
+<!-- NOUVEAU : Configuration PWA (Application Native) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zeïna">
+<link rel="apple-touch-icon" href="icon.png">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,5 +39,15 @@
     </form>
 </div>
 <script type="module" src="js/auth.js"></script>
+<script>
+    // Enregistrement du Service Worker pour la PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('PWA activée !'))
+                .catch(err => console.log('Erreur PWA :', err));
+        });
+    }
+</script>
 </body>
 </html>
