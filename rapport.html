@@ -11,9 +11,13 @@
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Zeïna">
+
+    <!-- LIBRAIRIE POUR LE TÉLÉCHARGEMENT PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
     <style>
         @media print {
-            #sidebar, nav, #form-dates, #btn-print { display: none !important; }
+            #sidebar, nav, #form-dates, #btn-print, #btn-download-pdf { display: none !important; }
             body { background: white !important; color: black !important; }
             .glass-card { background: white !important; border: 1px solid #ccc !important; color: black !important; backdrop-filter: none; box-shadow: none; }
             .text-white { color: black !important; }
@@ -68,7 +72,7 @@
         <button id="logout-sidebar-btn" class="w-full bg-red-500/10 hover:bg-red-600 active:scale-95 text-red-400 hover:text-white border border-red-500/20 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2">
             <i class="fa-solid fa-right-from-bracket"></i> Déconnexion
         </button>
-        <div class="text-xs text-slate-500 text-center">Zeïna v2.3</div>
+        <div class="text-xs text-slate-500 text-center">Zeïna v2.4</div>
     </div>
 </aside>
 
@@ -78,9 +82,15 @@
         <h2 class="text-2xl font-bold text-white flex items-center gap-2">
             <i class="fa-solid fa-chart-pie text-purple-400 animate-float"></i> Rapport d'activité
         </h2>
-        <button id="btn-print" onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-white border border-slate-600 px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2">
-            <i class="fa-solid fa-print"></i> Imprimer
-        </button>
+        <div class="flex flex-wrap gap-3 w-full md:w-auto">
+            <button id="btn-print" onclick="window.print()" class="flex-1 md:flex-none bg-slate-800 hover:bg-slate-700 active:scale-95 text-white border border-slate-600 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                <i class="fa-solid fa-print"></i> Imprimer
+            </button>
+            <!-- NOUVEAU BOUTON PDF -->
+            <button id="btn-download-pdf" class="flex-1 md:flex-none bg-purple-600 hover:bg-purple-500 active:scale-95 text-white shadow-lg btn-glow-purple px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                <i class="fa-solid fa-file-pdf"></i> Télécharger PDF
+            </button>
+        </div>
     </div>
 
     <div id="form-dates" class="glass-card p-6 rounded-2xl mb-8">
@@ -99,36 +109,49 @@
         </form>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div class="glass-card p-5 rounded-2xl text-center hover:-translate-y-1">
-            <i class="fa-solid fa-hand-holding-heart text-2xl text-blue-400 mb-2"></i>
-            <p class="text-3xl font-bold text-white" id="stat-prets">0</p>
-            <p class="text-xs text-slate-400 uppercase tracking-wide mt-1">Matériels Prêtés</p>
-        </div>
-        <div class="glass-card p-5 rounded-2xl text-center hover:-translate-y-1">
-            <i class="fa-solid fa-boxes-packing text-2xl text-emerald-400 mb-2"></i>
-            <p class="text-3xl font-bold text-white" id="stat-retours">0</p>
-            <p class="text-xs text-slate-400 uppercase tracking-wide mt-1">Matériels Rendus</p>
-        </div>
-        <div class="glass-card p-5 rounded-2xl text-center hover:-translate-y-1">
-            <i class="fa-solid fa-pills text-2xl text-amber-400 mb-2"></i>
-            <p class="text-3xl font-bold text-white" id="stat-dons">0</p>
-            <p class="text-xs text-slate-400 uppercase tracking-wide mt-1">Médicaments Donnés</p>
-        </div>
-        <div class="glass-card p-5 rounded-2xl text-center hover:-translate-y-1">
-            <i class="fa-solid fa-boxes-stacked text-2xl text-purple-400 mb-2"></i>
-            <p class="text-3xl font-bold text-white" id="stat-ajouts">0</p>
-            <p class="text-xs text-slate-400 uppercase tracking-wide mt-1">Médicaments Reçus</p>
-        </div>
-    </div>
+    <!-- ZONE À EXPORTER EN PDF -->
+    <div id="report-content" class="space-y-8 pb-4">
 
-    <div class="glass-card p-6 rounded-2xl">
-        <h3 class="text-lg font-bold text-white mb-6 border-b border-slate-700 pb-3"><i class="fa-solid fa-list-ul mr-2"></i> Journal détaillé des opérations</h3>
-
-        <div class="relative border-l border-slate-700 ml-3 space-y-6" id="report-timeline">
-            <p class="pl-6 text-slate-500 italic">Sélectionnez des dates pour générer le rapport.</p>
+        <div class="flex justify-between items-center mb-2 px-2 hidden" id="pdf-header">
+            <h3 class="font-bold text-white text-xl">Rapport Zeïna</h3>
+            <p class="text-sm text-slate-400" id="pdf-dates-display"></p>
         </div>
+
+        <!-- Les 4 cartes de statistiques -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="glass-card p-5 rounded-2xl text-center hover:-translate-y-1">
+                <i class="fa-solid fa-hand-holding-heart text-2xl text-blue-400 mb-2"></i>
+                <p class="text-3xl font-bold text-white" id="stat-prets">0</p>
+                <p class="text-xs text-slate-400 uppercase tracking-wide mt-1">Matériels Prêtés</p>
+            </div>
+            <div class="glass-card p-5 rounded-2xl text-center hover:-translate-y-1">
+                <i class="fa-solid fa-boxes-packing text-2xl text-emerald-400 mb-2"></i>
+                <p class="text-3xl font-bold text-white" id="stat-retours">0</p>
+                <p class="text-xs text-slate-400 uppercase tracking-wide mt-1">Matériels Rendus</p>
+            </div>
+            <div class="glass-card p-5 rounded-2xl text-center hover:-translate-y-1">
+                <i class="fa-solid fa-pills text-2xl text-amber-400 mb-2"></i>
+                <p class="text-3xl font-bold text-white" id="stat-dons">0</p>
+                <p class="text-xs text-slate-400 uppercase tracking-wide mt-1">Médicaments Donnés</p>
+            </div>
+            <div class="glass-card p-5 rounded-2xl text-center hover:-translate-y-1">
+                <i class="fa-solid fa-boxes-stacked text-2xl text-purple-400 mb-2"></i>
+                <p class="text-3xl font-bold text-white" id="stat-ajouts">0</p>
+                <p class="text-xs text-slate-400 uppercase tracking-wide mt-1">Médicaments Reçus</p>
+            </div>
+        </div>
+
+        <!-- Journal Détaillé -->
+        <div class="glass-card p-6 rounded-2xl">
+            <h3 class="text-lg font-bold text-white mb-6 border-b border-slate-700 pb-3"><i class="fa-solid fa-list-ul mr-2"></i> Journal détaillé des opérations</h3>
+
+            <div class="relative border-l border-slate-700 ml-3 space-y-6" id="report-timeline">
+                <p class="pl-6 text-slate-500 italic">Sélectionnez des dates pour générer le rapport.</p>
+            </div>
+        </div>
+
     </div>
+    <!-- FIN ZONE PDF -->
 
 </main>
 
@@ -142,6 +165,6 @@
     closeSidebar.addEventListener('click', toggleMenu);
     backdrop.addEventListener('click', toggleMenu);
 </script>
-<script type="module" src="js/rapport.js?v=2.3"></script>
+<script type="module" src="js/rapport.js?v=2.4"></script>
 </body>
 </html>

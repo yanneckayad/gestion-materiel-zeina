@@ -15,23 +15,15 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ==========================================
-// SYSTÈME DE MISE À JOUR FORCÉE
-const APP_VERSION = "2.2"; // ⚠️ Change ce numéro à chaque fois que tu mets à jour le site (ex: "2.1", "2.2")
-
+// Mise à jour de version pour vider le cache des utilisateurs
+const APP_VERSION = "2.4";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
-    // 1. On vide la mémoire cache du téléphone pour forcer le nouveau code
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
-    // 2. On mémorise la nouvelle version
     localStorage.setItem("zeina_version", APP_VERSION);
-    // 3. On force la déconnexion et on renvoie à l'accueil
-    signOut(auth).then(() => {
-        window.location.replace("index.html");
-    });
+    signOut(auth).then(() => { window.location.replace("index.html"); });
 }
-// ==========================================
 
 onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
@@ -64,7 +56,6 @@ async function generateReport() {
     endDate.setHours(23, 59, 59, 999);
 
     const submitBtn = document.querySelector('#report-form button');
-    const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calcul...';
     submitBtn.disabled = true;
 
@@ -89,7 +80,7 @@ async function generateReport() {
                 allEvents.push({
                     date: eventDate,
                     category: 'materiel',
-                    itemId: data.materielId, // Sauvegarde de l'ID pour le lien
+                    itemId: data.materielId,
                     type: 'pret',
                     titre: `Prêt : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
                     desc: `Au patient : ${data.patientNom} | Par : ${data.membreEmail}`,
@@ -109,7 +100,7 @@ async function generateReport() {
                 allEvents.push({
                     date: eventDate,
                     category: 'materiel',
-                    itemId: data.materielId, // Sauvegarde de l'ID pour le lien
+                    itemId: data.materielId,
                     type: 'retour',
                     titre: `Retour : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
                     desc: `Validé par : ${data.membreEmail}`,
@@ -132,7 +123,7 @@ async function generateReport() {
                     allEvents.push({
                         date: eventDate,
                         category: 'medicament',
-                        itemId: data.medicamentId, // Sauvegarde de l'ID pour le lien
+                        itemId: data.medicamentId,
                         type: 'don',
                         titre: `Don : ${medName} (-${data.quantite} boîte(s))`,
                         desc: `Au patient : ${data.beneficiaire} | Par : ${data.membreEmail}`,
@@ -145,7 +136,7 @@ async function generateReport() {
                     allEvents.push({
                         date: eventDate,
                         category: 'medicament',
-                        itemId: data.medicamentId, // Sauvegarde de l'ID pour le lien
+                        itemId: data.medicamentId,
                         type: 'ajout',
                         titre: `Ajout Stock : ${medName} (+${data.quantite} boîte(s))`,
                         desc: `Réceptionné par : ${data.membreEmail}`,
@@ -172,8 +163,6 @@ async function generateReport() {
         } else {
             allEvents.forEach(ev => {
                 const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-                // Définition de l'URL cible selon la catégorie (matériel ou médicament)
                 const targetUrl = ev.category === 'materiel' ? `history.html?id=${ev.itemId}` : `med-history.html?id=${ev.itemId}`;
 
                 const div = document.createElement('div');
@@ -182,7 +171,6 @@ async function generateReport() {
                     <div class="absolute -left-[17px] top-1 h-8 w-8 rounded-full ${ev.bg} border-4 border-slate-900 flex items-center justify-center z-10">
                         <i class="fa-solid ${ev.icon} ${ev.color} text-xs"></i>
                     </div>
-                    <!-- Transformation de la carte en lien cliquable -->
                     <a href="${targetUrl}" class="block bg-slate-900/50 p-3 rounded-xl border border-slate-700/50 hover:bg-slate-800 hover:border-slate-500 transition-all group shadow-sm hover:shadow-md cursor-pointer">
                         <div class="flex justify-between items-start flex-wrap gap-2">
                             <h4 class="text-white font-bold text-sm group-hover:text-blue-400 transition-colors flex items-center gap-2">
@@ -206,5 +194,42 @@ async function generateReport() {
         submitBtn.disabled = false;
     }
 }
+
+// LOGIQUE POUR LE TÉLÉCHARGEMENT PDF
+document.getElementById('btn-download-pdf').addEventListener('click', () => {
+    const btn = document.getElementById('btn-download-pdf');
+    const originalText = btn.innerHTML;
+
+    // On récupère la zone à imprimer
+    const element = document.getElementById('report-content');
+
+    // On affiche temporairement l'en-tête interne du PDF
+    const pdfHeader = document.getElementById('pdf-header');
+    const pdfDates = document.getElementById('pdf-dates-display');
+
+    const startStr = document.getElementById('date-debut').value;
+    const endStr = document.getElementById('date-fin').value;
+    pdfDates.textContent = `Période du ${startStr} au ${endStr}`;
+    pdfHeader.classList.remove('hidden');
+
+    // Options du PDF
+    const opt = {
+        margin:       10,
+        filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0f172a' },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
+    btn.disabled = true;
+
+    // Création du PDF
+    html2pdf().set(opt).from(element).save().then(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        pdfHeader.classList.add('hidden'); // On recache l'en-tête interne
+    });
+});
 
 generateReport();
