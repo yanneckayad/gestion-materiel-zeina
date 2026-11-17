@@ -19,11 +19,10 @@ onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
 });
 
-// Variables globales remontées en haut pour éviter l'erreur "Unresolved"
 let allMateriel = [];
 let currentFilter = "all";
 let searchQuery = "";
-let currentItemId; // "Variable initializer is redundant" corrigé
+let currentItemId;
 
 document.getElementById('logout-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
@@ -50,8 +49,16 @@ addItemForm.addEventListener('submit', async (e) => {
     }
 });
 
+// --- NOUVEAU : Fonction magique pour enlever les accents ---
+function enleverAccents(texte) {
+    if (!texte) return "";
+    // Transforme "é" en "e", "à" en "a", et met tout en minuscules
+    return texte.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+// Mise à jour de la barre de recherche avec le nettoyeur d'accents
 document.getElementById('search-bar').addEventListener('input', (e) => {
-    searchQuery = e.target.value.toLowerCase();
+    searchQuery = enleverAccents(e.target.value);
     renderInventory();
 });
 
@@ -77,10 +84,15 @@ const inventoryList = document.getElementById('inventory-list');
 function renderInventory() {
     inventoryList.innerHTML = "";
 
+    // NOUVEAU : On utilise la fonction enleverAccents pour comparer
     const filteredList = allMateriel.filter(item => {
         const matchStatus = currentFilter === "all" || item.data.statut === currentFilter;
-        const matchSearch = item.data.nom.toLowerCase().includes(searchQuery) ||
-            item.data.reference.toLowerCase().includes(searchQuery);
+
+        const nomPropre = enleverAccents(item.data.nom);
+        const refPropre = enleverAccents(item.data.reference);
+
+        const matchSearch = nomPropre.includes(searchQuery) || refPropre.includes(searchQuery);
+
         return matchStatus && matchSearch;
     });
 
@@ -185,7 +197,6 @@ noPhotoReturn.addEventListener('change', (e) => {
     if(e.target.checked) returnPhoto.value = "";
 });
 
-// --- NOUVEAU : Fonction unique pour envoyer l'image et éviter le "Duplicated code" ---
 async function uploadToCloudinary(file) {
     const formData = new FormData();
     formData.append("file", file);
@@ -210,7 +221,6 @@ loanForm.addEventListener('submit', async (e) => {
     try {
         let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
 
-        // Utilisation de notre nouvelle fonction raccourcie
         if (file && !isNoPhoto) {
             imageUrl = await uploadToCloudinary(file);
         }
@@ -254,7 +264,6 @@ returnForm.addEventListener('submit', async (e) => {
     try {
         let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
 
-        // Utilisation de notre nouvelle fonction raccourcie
         if (file && !isNoPhoto) {
             imageUrl = await uploadToCloudinary(file);
         }
