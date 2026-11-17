@@ -29,6 +29,40 @@ document.getElementById('logout-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
 });
 
+// --- NOUVEAU : Logique d'affichage et d'impression du QR après création ---
+const qrSuccessModal = document.getElementById('qr-success-modal');
+const qrSuccessBox = document.getElementById('qr-success-box');
+const qrSuccessName = document.getElementById('qr-success-name');
+const qrSuccessRef = document.getElementById('qr-success-ref');
+
+document.getElementById('btn-close-success').addEventListener('click', () => {
+    qrSuccessModal.classList.add('hidden');
+});
+
+// Fonction pour imprimer le QR Code propre
+document.getElementById('btn-print-qr').addEventListener('click', () => {
+    const canvas = qrSuccessBox.querySelector('canvas');
+    if(!canvas) return;
+    const qrImage = canvas.toDataURL("image/png");
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head><title>Impression Etiquette</title></head>
+        <body style="text-align: center; font-family: Arial, sans-serif; padding-top: 20px;">
+            <h2 style="margin-bottom: 5px;">${qrSuccessName.textContent}</h2>
+            <p style="font-size: 18px; color: #555; margin-top: 0;">Réf: <strong>${qrSuccessRef.textContent}</strong></p>
+            <img src="${qrImage}" style="margin: 20px auto; display: block; width: 150px; height: 150px;" />
+            <p style="font-size: 12px; color: #888;">La Lumière de l'Ange Zeïna</p>
+            <script>
+                window.onload = function() { setTimeout(() => { window.print(); window.close(); }, 500); }
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+});
+
 const addItemForm = document.getElementById('add-item-form');
 addItemForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -42,6 +76,21 @@ addItemForm.addEventListener('submit', async (e) => {
     try {
         await addDoc(collection(db, "materiel"), { nom: name, reference: ref, statut: "Disponible", dateAjout: new Date() });
         addItemForm.reset();
+
+        // Affichage de la fenêtre QR Code
+        qrSuccessName.textContent = name;
+        qrSuccessRef.textContent = ref;
+        qrSuccessBox.innerHTML = ""; // On nettoie l'ancien QR
+        new QRCode(qrSuccessBox, {
+            text: ref, // On encode uniquement la référence
+            width: 150,
+            height: 150,
+            colorDark : "#0f172a",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+        qrSuccessModal.classList.remove('hidden');
+
     } catch (error) {
         alert("Erreur lors de l'ajout : " + error.message);
     } finally {
@@ -180,13 +229,47 @@ function renderInventory() {
     });
 }
 
-// 🔥 LE "MOTEUR" FIREBASE QUI AVAIT DISPARU EST DE RETOUR ICI 🔥
 onSnapshot(collection(db, "materiel"), (snapshot) => {
     allMateriel = [];
     snapshot.forEach((doc) => {
         allMateriel.push({ id: doc.id, data: doc.data() });
     });
     renderInventory();
+});
+
+let html5QrcodeScanner;
+const qrModal = document.getElementById('qr-modal');
+const btnScanQr = document.getElementById('btn-scan-qr');
+const closeQrModalBtn = document.getElementById('close-qr-modal');
+const searchBar = document.getElementById('search-bar');
+
+btnScanQr.addEventListener('click', () => {
+    qrModal.classList.remove('hidden');
+    html5QrcodeScanner = new Html5Qrcode("qr-reader");
+    html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+            html5QrcodeScanner.stop().then(() => {
+                qrModal.classList.add('hidden');
+                searchBar.value = decodedText;
+                searchQuery = enleverAccents(decodedText);
+                renderInventory();
+            }).catch(err => console.error(err));
+        },
+        (errorMessage) => { }
+    ).catch(err => {
+        alert("Erreur d'accès à la caméra. Vérifiez les autorisations sur Vercel.");
+        qrModal.classList.add('hidden');
+    });
+});
+
+closeQrModalBtn.addEventListener('click', () => {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => qrModal.classList.add('hidden')).catch(err => qrModal.classList.add('hidden'));
+    } else {
+        qrModal.classList.add('hidden');
+    }
 });
 
 function genererBonDePretPDF(equipementNom, equipementRef, infosPret) {

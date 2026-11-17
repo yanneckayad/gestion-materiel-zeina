@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Ta configuration Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyA5RLJI5ahBhZKGQNLXCFWIEnRxx0MNN44",
     authDomain: "zeina-materiel.firebaseapp.com",
@@ -12,123 +12,187 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Sécurité : Redirection si non connecté
+onAuthStateChanged(auth, (user) => {
+    if (!user) window.location.href = "index.html";
+});
+
+// Récupération de l'ID du matériel dans l'URL
 const urlParams = new URLSearchParams(window.location.search);
 const itemId = urlParams.get('id');
 
-if (!itemId) window.location.href = "dashboard.html";
+if (!itemId) {
+    alert("Aucun matériel sélectionné.");
+    window.location.href = "dashboard.html";
+}
 
-const itemTitle = document.getElementById('item-title');
-const itemRef = document.getElementById('item-ref');
-const timeline = document.getElementById('timeline');
+// Références HTML
+const itemNameEl = document.getElementById('item-name');
+const itemRefEl = document.getElementById('item-ref');
+const itemStatusEl = document.getElementById('item-status');
+const qrBox = document.getElementById('qr-box');
+const timelineEl = document.getElementById('history-timeline');
 
-async function loadHistory() {
+// Fonction pour charger les données du matériel
+async function loadItemData() {
     try {
-        const itemDoc = await getDoc(doc(db, "materiel", itemId));
-        if (itemDoc.exists()) {
-            itemTitle.textContent = itemDoc.data().nom;
-            itemRef.textContent = "Référence : " + itemDoc.data().reference;
-        } else {
-            itemTitle.textContent = "Matériel introuvable";
-            return;
-        }
+        const itemSnap = await getDoc(doc(db, "materiel", itemId));
+        if (itemSnap.exists()) {
+            const data = itemSnap.data();
 
-        const qPrets = query(collection(db, "prets"), where("materielId", "==", itemId));
-        const pretsSnapshot = await getDocs(qPrets);
+            // Affichage des infos texte
+            itemNameEl.textContent = data.nom;
+            itemRefEl.textContent = data.reference;
 
-        const qRetours = query(collection(db, "retours"), where("materielId", "==", itemId));
-        const retoursSnapshot = await getDocs(qRetours);
-
-        let events = [];
-
-        pretsSnapshot.forEach((doc) => {
-            const data = doc.data();
-
-            // Transforme la date de "2026-11-16" à "16/11/2026"
-            let dateSaisie = "Non spécifiée";
-            if (data.dateDebutPret) {
-                const parts = data.dateDebutPret.split('-');
-                if (parts.length === 3) dateSaisie = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            // Affichage du joli badge de statut
+            if (data.statut === "Disponible") {
+                itemStatusEl.innerHTML = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-circle-check"></i> Disponible</span>`;
+            } else if (data.statut === "En prêt") {
+                itemStatusEl.innerHTML = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"><i class="fa-solid fa-clock"></i> En prêt</span>`;
+            } else {
+                itemStatusEl.innerHTML = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20"><i class="fa-solid fa-wrench"></i> En réparation</span>`;
             }
 
-            events.push({
-                type: "Prêt",
-                date: data.datePret.toDate(),
-                dateSaisie: dateSaisie, // La nouvelle date demandée
-                membre: data.membreNom || data.membreEmail, // Le nouveau nom du bénévole
-                patient: data.patientNom,
-                pieceId: data.patientPieceId || "Non renseignée", // La nouvelle pièce d'identité
-                telephone: data.patientTelephone,
-                duree: data.duree,
-                photo: data.photoSortie
+            // Génération du QR Code
+            new QRCode(qrBox, {
+                text: data.reference,
+                width: 150,
+                height: 150,
+                colorDark : "#0f172a",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
             });
-        });
 
-        retoursSnapshot.forEach((doc) => {
+            // Logique du bouton Imprimer
+            document.getElementById('btn-print-qr').addEventListener('click', () => {
+                const canvas = qrBox.querySelector('canvas');
+                if(!canvas) return;
+                const qrImage = canvas.toDataURL("image/png");
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(`
+                    <html>
+                    <head><title>Impression Etiquette</title></head>
+                    <body style="text-align: center; font-family: Arial, sans-serif; padding-top: 20px;">
+                        <h2 style="margin-bottom: 5px;">${data.nom}</h2>
+                        <p style="font-size: 18px; color: #555; margin-top: 0;">Réf: <strong>${data.reference}</strong></p>
+                        <img src="${qrImage}" style="margin: 20px auto; display: block; width: 150px; height: 150px;" />
+                        <p style="font-size: 12px; color: #888;">La Lumière de l'Ange Zeïna</p>
+                        <script>window.onload = function() { setTimeout(() => { window.print(); window.close(); }, 500); }<\/script>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+            });
+
+            // On charge ensuite l'historique
+            loadHistory();
+        } else {
+            alert("Matériel introuvable.");
+        }
+    } catch (error) {
+        console.error("Erreur de chargement :", error);
+    }
+}
+
+// Fonction pour charger la timeline
+async function loadHistory() {
+    try {
+        let history = [];
+
+        // 1. Récupérer les PRÊTS
+        const pretsQuery = query(collection(db, "prets"), where("materielId", "==", itemId));
+        const pretsSnap = await getDocs(pretsQuery);
+        pretsSnap.forEach(doc => {
             const data = doc.data();
-            events.push({
-                type: "Retour",
-                date: data.dateRetour.toDate(),
-                membre: data.membreEmail,
-                photo: data.photoRetour
+            history.push({
+                type: 'pret',
+                dateObject: data.datePret.toDate(), // Utile pour trier
+                dateFormatee: data.datePret.toDate().toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                data: data
             });
         });
 
-        events.sort((a, b) => b.date - a.date);
+        // 2. Récupérer les RETOURS
+        const retoursQuery = query(collection(db, "retours"), where("materielId", "==", itemId));
+        const retoursSnap = await getDocs(retoursQuery);
+        retoursSnap.forEach(doc => {
+            const data = doc.data();
+            history.push({
+                type: 'retour',
+                dateObject: data.dateRetour.toDate(),
+                dateFormatee: data.dateRetour.toDate().toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                data: data
+            });
+        });
 
-        timeline.innerHTML = "";
+        // 3. Trier du plus récent au plus ancien
+        history.sort((a, b) => b.dateObject - a.dateObject);
 
-        if (events.length === 0) {
-            timeline.innerHTML = '<p class="text-slate-400">Aucun historique pour ce matériel.</p>';
+        // 4. Affichage
+        timelineEl.innerHTML = ""; // Vider le "chargement..."
+
+        if (history.length === 0) {
+            timelineEl.innerHTML = `<p class="pl-6 text-slate-500 italic">Aucun mouvement enregistré pour ce matériel.</p>`;
             return;
         }
 
-        events.forEach(event => {
-            const dateStr = event.date.toLocaleDateString('fr-FR') + ' à ' + event.date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+        history.forEach(event => {
+            const div = document.createElement('div');
+            div.className = "relative pl-8 sm:pl-10";
 
-            if (event.type === "Prêt") {
-                timeline.innerHTML += `
-                    <div class="mb-8 relative">
-                        <div class="absolute -left-[33px] bg-blue-500 h-4 w-4 rounded-full border-4 border-slate-900"></div>
-                        <div class="bg-slate-800 p-5 rounded-lg border border-slate-700">
-                            <div class="flex justify-between items-start mb-3">
-                                <span class="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Sortie en prêt</span>
-                                <span class="text-sm text-slate-400">Saisi le ${dateStr}</span>
+            if (event.type === 'pret') {
+                div.innerHTML = `
+                    <div class="absolute -left-[17px] top-1 h-8 w-8 rounded-full bg-blue-900 border-4 border-slate-900 flex items-center justify-center">
+                        <i class="fa-solid fa-hand-holding-heart text-blue-400 text-xs"></i>
+                    </div>
+                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                        <div class="flex justify-between items-start mb-2 flex-wrap gap-2">
+                            <span class="px-2 py-1 bg-blue-500/10 text-blue-400 text-xs font-bold uppercase rounded border border-blue-500/20">Prêt</span>
+                            <span class="text-xs text-slate-400 font-mono"><i class="fa-regular fa-clock mr-1"></i> ${event.dateFormatee}</span>
+                        </div>
+                        <p class="text-white text-sm mb-2"><span class="text-slate-400">Au patient :</span> <span class="font-bold">${event.data.patientNom}</span></p>
+                        <p class="text-sm text-slate-300 mb-3"><span class="text-slate-400">Par :</span> ${event.data.membreNom} (${event.data.membreEmail})</p>
+                        <div class="mt-2 border-t border-slate-700 pt-3 flex flex-col sm:flex-row gap-4">
+                            <div class="flex-1 text-xs text-slate-400 space-y-1">
+                                <p><i class="fa-solid fa-phone w-4 text-center"></i> ${event.data.patientTelephone}</p>
+                                <p><i class="fa-solid fa-id-card w-4 text-center"></i> ${event.data.patientPieceId}</p>
                             </div>
-                            <p class="text-slate-300 mb-1"><span class="font-semibold text-white">Date du prêt :</span> ${event.dateSaisie}</p>
-                            <p class="text-slate-300 mb-1"><span class="font-semibold text-white">Patient :</span> ${event.patient} (Tél: ${event.telephone})</p>
-                            <p class="text-slate-300 mb-1"><span class="font-semibold text-white">N° Pièce d'identité :</span> ${event.pieceId}</p>
-                            <p class="text-slate-300 mb-3"><span class="font-semibold text-white">Durée :</span> ${event.duree} durée</p>
-                            <a href="${event.photo}" target="_blank" class="block w-32 rounded-lg overflow-hidden border border-slate-600 hover:opacity-80 transition">
-                                <img src="${event.photo}" alt="État sortie" class="w-full h-auto object-cover">
-                            </a>
-                            <p class="text-xs text-slate-500 mt-3">Bénévole : ${event.membre}</p>
+                            <div class="w-24 h-24 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                                <img src="${event.data.photoSortie}" alt="Photo prêt" class="w-full h-full object-cover">
+                            </div>
                         </div>
                     </div>
                 `;
             } else {
-                timeline.innerHTML += `
-                    <div class="mb-8 relative">
-                        <div class="absolute -left-[33px] bg-green-500 h-4 w-4 rounded-full border-4 border-slate-900"></div>
-                        <div class="bg-slate-800 p-5 rounded-lg border border-slate-700">
-                            <div class="flex justify-between items-start mb-3">
-                                <span class="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Retour</span>
-                                <span class="text-sm text-slate-400">${dateStr}</span>
+                div.innerHTML = `
+                    <div class="absolute -left-[17px] top-1 h-8 w-8 rounded-full bg-emerald-900 border-4 border-slate-900 flex items-center justify-center">
+                        <i class="fa-solid fa-boxes-packing text-emerald-400 text-xs"></i>
+                    </div>
+                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                        <div class="flex justify-between items-start mb-2 flex-wrap gap-2">
+                            <span class="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase rounded border border-emerald-500/20">Retour</span>
+                            <span class="text-xs text-slate-400 font-mono"><i class="fa-regular fa-clock mr-1"></i> ${event.dateFormatee}</span>
+                        </div>
+                        <p class="text-sm text-slate-300 mb-3"><span class="text-slate-400">Validé par :</span> ${event.data.membreEmail}</p>
+                        <div class="mt-2 border-t border-slate-700 pt-3 flex">
+                            <div class="w-24 h-24 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden">
+                                <img src="${event.data.photoRetour}" alt="Photo retour" class="w-full h-full object-cover">
                             </div>
-                            <a href="${event.photo}" target="_blank" class="block w-32 rounded-lg overflow-hidden border border-slate-600 hover:opacity-80 transition">
-                                <img src="${event.photo}" alt="État retour" class="w-full h-auto object-cover">
-                            </a>
-                            <p class="text-xs text-slate-500 mt-3">Récupéré par : ${event.membre}</p>
                         </div>
                     </div>
                 `;
             }
+            timelineEl.appendChild(div);
         });
 
     } catch (error) {
-        timeline.innerHTML = `<p class="text-red-400">Erreur : ${error.message}</p>`;
+        console.error("Erreur historique :", error);
+        timelineEl.innerHTML = `<p class="pl-6 text-red-400">Erreur lors du chargement de l'historique.</p>`;
     }
 }
 
-loadHistory();
+// Démarrage
+loadItemData();

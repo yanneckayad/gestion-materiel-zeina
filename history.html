@@ -5,36 +5,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Historique - La Lumière de l'Ange Zeïna</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Librairie pour le QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen">
+<body class="bg-slate-900 text-slate-200 min-h-screen relative selection:bg-blue-500/30">
 
 <!-- Barre de navigation -->
-<nav class="bg-slate-800 p-4 shadow-md flex justify-between items-center">
-    <a href="dashboard.html" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition">
-        ← Retour au registre
-    </a>
-    <div class="font-bold text-xl">Fiche Historique</div>
+<nav class="bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-800 p-4 shadow-lg">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+        <div class="font-black text-2xl flex items-center gap-3 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent tracking-tight">
+            <i class="fa-solid fa-hand-holding-medical text-blue-500"></i> Zeïna
+        </div>
+        <a href="dashboard.html" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2">
+            <i class="fa-solid fa-arrow-left"></i> <span class="hidden sm:inline">Retour Inventaire</span>
+        </a>
+    </div>
 </nav>
 
-<!-- Contenu principal -->
-<main class="p-8 max-w-3xl mx-auto">
+<main class="p-4 sm:p-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
 
-    <!-- En-tête du matériel -->
-    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8">
-        <h1 id="item-title" class="text-3xl font-bold mb-2">Chargement...</h1>
-        <p id="item-ref" class="text-slate-400 text-lg"></p>
+    <!-- Colonne de gauche : Infos & QR Code -->
+    <div class="col-span-1 space-y-6">
+
+        <!-- Carte d'identité du matériel -->
+        <div class="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl">
+            <h2 class="text-xl font-bold mb-4 flex items-center gap-2 text-white">
+                <i class="fa-solid fa-circle-info text-blue-400"></i> Fiche Matériel
+            </h2>
+
+            <div class="space-y-4">
+                <div>
+                    <p class="text-sm text-slate-400">Nom de l'équipement</p>
+                    <p id="item-name" class="text-lg font-bold text-white"></p>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-400">Référence</p>
+                    <p id="item-ref" class="font-mono bg-slate-900 px-3 py-1 rounded inline-block border border-slate-700 mt-1"></p>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-400 mb-1">Statut actuel</p>
+                    <div id="item-status"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte QR Code -->
+        <div class="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl flex flex-col items-center">
+            <h3 class="text-md font-bold mb-4 text-white">Code d'identification</h3>
+            <div class="bg-white p-4 rounded-xl shadow-inner mb-4">
+                <div id="qr-box"></div>
+            </div>
+            <button id="btn-print-qr" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 rounded-xl border border-slate-600 transition-colors flex justify-center items-center gap-2">
+                <i class="fa-solid fa-print"></i> Imprimer l'étiquette
+            </button>
+        </div>
+
     </div>
 
-    <h2 class="text-xl font-bold mb-6 border-b border-slate-700 pb-2">Chronologie des mouvements</h2>
+    <!-- Colonne de droite : Historique Chronologique -->
+    <div class="col-span-1 lg:col-span-2 bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl">
+        <h2 class="text-xl font-bold mb-8 flex items-center gap-2 text-white">
+            <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i> Historique des mouvements
+        </h2>
 
-    <!-- La chronologie s'affichera ici -->
-    <div id="timeline" class="space-y-6 border-l-2 border-slate-700 ml-4 pl-6 relative">
-        <p class="text-slate-400">Récupération de l'historique...</p>
+        <!-- Conteneur de la Timeline -->
+        <div class="relative border-l border-slate-700 ml-3 space-y-8" id="history-timeline">
+            <!-- Message de chargement -->
+            <div class="animate-pulse pl-6 text-slate-500 flex items-center gap-2">
+                <i class="fa-solid fa-spinner fa-spin"></i> Récupération de l'historique...
+            </div>
+        </div>
     </div>
 
 </main>
 
-<!-- Script JavaScript -->
 <script type="module" src="js/history.js"></script>
 </body>
 </html>
