@@ -7,6 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- Librairie pour le Scanner (QR Code et Codes-barres) -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -50,7 +53,7 @@
 
 <main class="p-4 sm:p-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-    <!-- Formulaire d'ajout -->
+    <!-- Formulaire d'ajout classique -->
     <div class="col-span-1 bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl h-fit">
         <h2 class="text-xl font-bold mb-6 flex items-center gap-2 text-white">
             <i class="fa-solid fa-capsules text-blue-400"></i> Nouveau médicament
@@ -78,7 +81,7 @@
         </form>
     </div>
 
-    <!-- Liste et filtres -->
+    <!-- Liste, Recherche, Filtres et Bouton Scan -->
     <div class="col-span-1 lg:col-span-2 bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl">
         <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-4">
             <h2 class="text-xl font-bold flex items-center gap-2 text-white whitespace-nowrap">
@@ -86,12 +89,17 @@
             </h2>
 
             <div class="flex flex-col sm:flex-row w-full xl:w-auto gap-3">
-                <div class="relative w-full sm:w-56">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
-                    <input type="text" id="search-med" placeholder="Rechercher..." class="w-full pl-9 pr-3 py-2 bg-slate-900/80 text-white border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/50">
+                <!-- Recherche + Bouton Scanner code-barres -->
+                <div class="flex w-full sm:w-auto gap-2">
+                    <div class="relative flex-grow sm:w-48">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                        <input type="text" id="search-med" placeholder="Rechercher..." class="w-full pl-9 pr-3 py-2 bg-slate-900/80 text-white border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/50">
+                    </div>
+                    <button id="btn-scan-barcode" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-md flex items-center gap-2 whitespace-nowrap" title="Scanner un code-barres">
+                        <i class="fa-solid fa-barcode"></i> <span class="hidden sm:inline">Scanner</span>
+                    </button>
                 </div>
 
-                <!-- NOUVEAU : Boutons de filtres -->
                 <div class="flex space-x-1 bg-slate-900/80 p-1.5 rounded-xl border border-slate-700 w-full sm:w-auto overflow-x-auto">
                     <button id="filter-all" class="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 text-white shadow-md transition-all">Tous</button>
                     <button id="filter-stock" class="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">En stock</button>
@@ -107,6 +115,58 @@
         </div>
     </div>
 </main>
+
+<!-- NOUVEAU : Fenêtre Modale du Scanner Code-barres -->
+<div id="barcode-modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-md animate-pop-in">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-barcode text-blue-400"></i> Scanner la boîte</h2>
+            <button id="close-barcode-modal" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div id="barcode-reader" class="w-full rounded-lg overflow-hidden border border-slate-600 bg-black min-h-[250px]"></div>
+        <p class="text-sm text-slate-400 mt-4 text-center">Placez le code-barres de la boîte de médicament dans le cadre.</p>
+    </div>
+</div>
+
+<!-- NOUVEAU : Fenêtre Modale si le médicament n'existe pas -->
+<div id="new-med-modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-md animate-pop-in">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Nouveau médicament</h2>
+            <button id="close-new-med-modal" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+
+        <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-4 text-center">
+            <p class="text-amber-400 text-sm font-semibold">Ce médicament n'existe pas encore dans le stock.</p>
+            <p id="scanned-code-display" class="text-xs text-slate-400 font-mono mt-1"></p>
+        </div>
+
+        <form id="new-scanned-med-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Nom du médicament & Dosage</label>
+                <input type="text" id="scanned-med-name" placeholder="Ex: Efferalgan 500mg" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Quantité (Boîtes)</label>
+                    <input type="number" id="scanned-med-stock" min="1" value="1" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Date péremption</label>
+                    <input type="date" id="scanned-med-exp" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Photo de la boîte</label>
+                <input type="file" id="scanned-med-photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white">
+            </div>
+            <div class="flex space-x-3 pt-2">
+                <button type="button" id="cancel-new-med" class="flex-1 bg-slate-700 text-white py-3 rounded-xl">Annuler</button>
+                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- Modale de Distribution -->
 <div id="give-med-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">

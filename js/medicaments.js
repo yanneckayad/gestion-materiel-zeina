@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, deleteDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyA5RLJI5ahBhZKGQNLXCFWIEnRxx0MNN44",
@@ -24,6 +24,7 @@ let searchQuery = "";
 let currentFilter = "all";
 let currentMedId = null;
 let currentMedMaxStock = 0;
+let scannedBarcodeValue = "";
 
 document.getElementById('logout-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
@@ -60,6 +61,7 @@ async function uploadToCloudinary(file) {
     return data.secure_url;
 }
 
+// Ajout classique via le formulaire de gauche
 const addMedForm = document.getElementById('add-med-form');
 addMedForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -83,6 +85,7 @@ addMedForm.addEventListener('submit', async (e) => {
             quantite: stock,
             dateExpiration: expDate,
             photo: imageUrl,
+            codeBarre: "",
             dateAjout: new Date()
         });
 
@@ -103,6 +106,113 @@ addMedForm.addEventListener('submit', async (e) => {
         submitBtn.disabled = false;
     }
 });
+
+// --- LOGIQUE DU SCANNER DE CODE-BARRES ---
+let html5BarcodeScanner;
+const barcodeModal = document.getElementById('barcode-modal');
+const newMedModal = document.getElementById('new-med-modal');
+
+document.getElementById('btn-scan-barcode').addEventListener('click', () => {
+    barcodeModal.classList.remove('hidden');
+    html5BarcodeScanner = new Html5Qrcode("barcode-reader");
+    html5BarcodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 280, height: 150 } },
+        async (decodedText) => {
+            // Succès du scan du code-barres
+            await html5BarcodeScanner.stop();
+            barcodeModal.classList.add('hidden');
+            scannedBarcodeValue = decodedText;
+
+            // Vérifier si le code-barres existe déjà dans Firestore
+            await verifierCodeBarre(decodedText);
+        },
+        (errorMessage) => {}
+    ).catch(err => {
+        alert("Erreur d'accès à la caméra : " + err);
+        barcodeModal.classList.add('hidden');
+    });
+});
+
+document.getElementById('close-barcode-modal').addEventListener('click', () => {
+    if (html5BarcodeScanner) {
+        html5BarcodeScanner.stop().then(() => barcodeModal.classList.add('hidden')).catch(() => barcodeModal.classList.add('hidden'));
+    } else {
+        barcodeModal.classList.add('hidden');
+    }
+});
+
+// Vérification si le médicament existe déjà par son code-barres
+async function verifierCodeBarre(code) {
+    try {
+        const q = query(collection(db, "medicaments"), where("codeBarre", "==", code));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            // Cas 1 : Il existe déjà ! On isole le médicament dans la recherche
+            const docSnap = querySnapshot.docs[0];
+            const medData = docSnap.data();
+
+            document.getElementById('search-med').value = medData.nom;
+            searchQuery = medData.nom.toLowerCase();
+            renderMeds();
+            alert(`Médicament reconnu : "${medData.nom}" (Stock : ${medData.quantite} boîtes)`);
+        } else {
+            // Cas 2 : Inexistant, on ouvre la modale d'enregistrement
+            document.getElementById('scanned-code-display').textContent = `Code-barres scanné : ${code}`;
+            document.getElementById('scanned-med-name').value = "";
+            document.getElementById('scanned-med-stock').value = 1;
+            document.getElementById('scanned-med-exp').value = "";
+            document.getElementById('scanned-med-photo').value = "";
+            newMedModal.classList.remove('hidden');
+        }
+    } catch (error) {
+        alert("Erreur lors de la vérification : " + error.message);
+    }
+}
+
+// Fermeture de la modale nouveau médicament scanné
+document.getElementById('close-new-med-modal').addEventListener('click', () => newMedModal.classList.add('hidden'));
+document.getElementById('cancel-new-med').addEventListener('click', () => newMedModal.classList.add('hidden'));
+
+// Enregistrement du nouveau médicament depuis le scan
+document.getElementById('new-scanned-med-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('scanned-med-name').value;
+    const stock = parseInt(document.getElementById('scanned-med-stock').value);
+    const expDate = document.getElementById('scanned-med-exp').value;
+    const file = document.getElementById('scanned-med-photo').files[0];
+
+    if (!expDate) return alert("Veuillez sélectionner une date d'expiration.");
+
+    try {
+        let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Boîte+de+médicament";
+        if (file) imageUrl = await uploadToCloudinary(file);
+
+        const medRef = await addDoc(collection(db, "medicaments"), {
+            nom: name,
+            quantite: stock,
+            dateExpiration: expDate,
+            photo: imageUrl,
+            codeBarre: scannedBarcodeValue, // On associe le code-barres scanné
+            dateAjout: new Date()
+        });
+
+        await addDoc(collection(db, "historique_medicaments"), {
+            medicamentId: medRef.id,
+            type: "ajout_stock",
+            quantite: stock,
+            membreEmail: auth.currentUser ? auth.currentUser.email : "Inconnu",
+            date: new Date()
+        });
+
+        newMedModal.classList.add('hidden');
+        alert(`Nouveau médicament "${name}" enregistré avec succès !`);
+    } catch (error) {
+        alert("Erreur : " + error.message);
+    }
+});
+
 
 const medListEl = document.getElementById('med-list');
 
@@ -167,11 +277,9 @@ function renderMeds() {
                 <button class="btn-give bg-emerald-600/25 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5" data-id="${id}" data-nom="${data.nom}" data-stock="${data.quantite}">
                     <i class="fa-solid fa-hand-holding-medical pointer-events-none"></i> Donner
                 </button>
-                
                 <button class="btn-restock bg-blue-600/25 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5" data-id="${id}" data-nom="${data.nom}">
                     <i class="fa-solid fa-boxes-stacked pointer-events-none"></i> + Stock
                 </button>
-
                 <button onclick="deleteMed('${id}')" class="w-9 h-9 bg-slate-800 hover:bg-red-600/20 text-slate-400 hover:text-red-400 border border-slate-700 rounded-lg transition-all ml-1" title="Supprimer"><i class="fa-solid fa-trash"></i></button>
             </div>
         `;
@@ -200,9 +308,7 @@ document.getElementById('give-med-form').addEventListener('submit', async (e) =>
     const qtyToGive = parseInt(document.getElementById('give-quantity').value);
     const beneficiary = document.getElementById('give-beneficiary').value;
 
-    if (qtyToGive > currentMedMaxStock) {
-        return alert("Erreur : Pas assez de stock disponible !");
-    }
+    if (qtyToGive > currentMedMaxStock) return alert("Erreur : Pas assez de stock !");
 
     try {
         const newStock = currentMedMaxStock - qtyToGive;
@@ -224,7 +330,6 @@ document.getElementById('give-med-form').addEventListener('submit', async (e) =>
     }
 });
 
-// Gestion du clic sur le bouton + Stock (quantité personnalisée)
 document.addEventListener('click', async (e) => {
     if (e.target.classList.contains('btn-restock')) {
         const id = e.target.getAttribute('data-id');
@@ -234,17 +339,12 @@ document.addEventListener('click', async (e) => {
         if (!saisie) return;
 
         const qtéAjoutee = parseInt(saisie);
-        if (isNaN(qtéAjoutee) || qtéAjoutee <= 0) {
-            alert("Veuillez entrer un nombre valide.");
-            return;
-        }
+        if (isNaN(qtéAjoutee) || qtéAjoutee <= 0) return alert("Nombre invalide.");
 
         try {
             const medDoc = await getDoc(doc(db, "medicaments", id));
             if (medDoc.exists()) {
-                const stockActuel = medDoc.data().quantite;
-                const nouveauStock = stockActuel + qtéAjoutee;
-
+                const nouveauStock = medDoc.data().quantite + qtéAjoutee;
                 await updateDoc(doc(db, "medicaments", id), { quantite: nouveauStock });
 
                 await addDoc(collection(db, "historique_medicaments"), {
@@ -258,7 +358,7 @@ document.addEventListener('click', async (e) => {
                 alert(`Succès ! +${qtéAjoutee} boîtes ajoutées à ${nom}.`);
             }
         } catch (error) {
-            alert("Erreur lors de la mise à jour du stock : " + error.message);
+            alert("Erreur : " + error.message);
         }
     }
 });
