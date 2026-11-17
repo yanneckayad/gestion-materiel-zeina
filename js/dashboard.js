@@ -15,6 +15,25 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// ==========================================
+// SYSTÈME DE MISE À JOUR FORCÉE
+const APP_VERSION = "2.1"; // ⚠️ Change ce numéro à chaque fois que tu mets à jour le site (ex: "2.1", "2.2")
+
+if (localStorage.getItem("zeina_version") !== APP_VERSION) {
+    // 1. On vide la mémoire cache du téléphone pour forcer le nouveau code
+    if ('caches' in window) {
+        caches.keys().then(names => names.forEach(name => caches.delete(name)));
+    }
+    // 2. On mémorise la nouvelle version
+    localStorage.setItem("zeina_version", APP_VERSION);
+    // 3. On force la déconnexion et on renvoie à l'accueil
+    signOut(auth).then(() => {
+        window.location.replace("index.html");
+    });
+}
+// ==========================================
+
+
 onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
 });
