@@ -16,8 +16,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // ==========================================
-// SYSTÈME DE MISE À JOUR FORCÉE
-const APP_VERSION = "2.2";
+const APP_VERSION = "2.4";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
@@ -285,9 +284,8 @@ function renderMeds() {
         const lotsHtml = lots.map(l => `<span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 font-mono text-[10px]">${l.quantite}x Exp: ${l.dateExpiration}</span>`).join(' ');
 
         const card = document.createElement('div');
-        // NOUVEAU : Effet Cascade (animate-slide-up), Délai (animationDelay), et Survol (hover:-translate-y-1, hover:shadow-xl)
         card.className = "animate-slide-up bg-slate-900/40 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-slate-700/50 hover:border-slate-500 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-900/10 transition-all duration-300";
-        card.style.animationDelay = `${index * 60}ms`; // Décale l'apparition de chaque carte de 60ms
+        card.style.animationDelay = `${index * 60}ms`;
 
         card.innerHTML = `
             <div class="flex items-center gap-4 w-full sm:w-auto">
@@ -320,7 +318,6 @@ function renderMeds() {
         medListEl.appendChild(card);
     });
 
-    // Réattachement des événements (le reste du code reste identique)
     document.querySelectorAll('.btn-give').forEach(button => {
         button.addEventListener('click', async (e) => {
             currentMedId = e.target.getAttribute('data-id');

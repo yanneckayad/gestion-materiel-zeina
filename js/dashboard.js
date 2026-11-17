@@ -17,7 +17,7 @@ const db = getFirestore(app);
 
 // ==========================================
 // SYSTÈME DE MISE À JOUR FORCÉE
-const APP_VERSION = "2.2"; // ⚠️ Change ce numéro à chaque fois que tu mets à jour le site (ex: "2.1", "2.2")
+const APP_VERSION = "2.4"; // Version unifiée pour toutes les pages
 
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     // 1. On vide la mémoire cache du téléphone pour forcer le nouveau code
@@ -48,7 +48,7 @@ document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
 });
 
-// --- NOUVEAU : Logique d'affichage et d'impression du QR après création ---
+// --- Logique d'affichage et d'impression du QR après création ---
 const qrSuccessModal = document.getElementById('qr-success-modal');
 const qrSuccessBox = document.getElementById('qr-success-box');
 const qrSuccessName = document.getElementById('qr-success-name');

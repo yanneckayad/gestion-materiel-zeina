@@ -15,7 +15,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Mise à jour de version pour vider le cache des utilisateurs
+// ==========================================
 const APP_VERSION = "2.4";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
@@ -24,6 +24,7 @@ if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     localStorage.setItem("zeina_version", APP_VERSION);
     signOut(auth).then(() => { window.location.replace("index.html"); });
 }
+// ==========================================
 
 onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
@@ -56,6 +57,7 @@ async function generateReport() {
     endDate.setHours(23, 59, 59, 999);
 
     const submitBtn = document.querySelector('#report-form button');
+    const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calcul...';
     submitBtn.disabled = true;
 
@@ -187,49 +189,46 @@ async function generateReport() {
         }
 
     } catch (error) {
-        alert("Erreur lors de la génération du rapport : " + error.message);
-        console.error(error);
+        alert("Erreur lors de la génération : " + error.message);
     } finally {
         submitBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Analyser';
         submitBtn.disabled = false;
     }
 }
 
-// LOGIQUE POUR LE TÉLÉCHARGEMENT PDF
-document.getElementById('btn-download-pdf').addEventListener('click', () => {
-    const btn = document.getElementById('btn-download-pdf');
-    const originalText = btn.innerHTML;
+// TÉLÉCHARGEMENT PDF
+const btnDownloadPdf = document.getElementById('btn-download-pdf');
+if(btnDownloadPdf) {
+    btnDownloadPdf.addEventListener('click', () => {
+        const btn = document.getElementById('btn-download-pdf');
+        const originalText = btn.innerHTML;
 
-    // On récupère la zone à imprimer
-    const element = document.getElementById('report-content');
+        const element = document.getElementById('report-content');
+        const pdfHeader = document.getElementById('pdf-header');
+        const pdfDates = document.getElementById('pdf-dates-display');
 
-    // On affiche temporairement l'en-tête interne du PDF
-    const pdfHeader = document.getElementById('pdf-header');
-    const pdfDates = document.getElementById('pdf-dates-display');
+        const startStr = document.getElementById('date-debut').value;
+        const endStr = document.getElementById('date-fin').value;
+        pdfDates.textContent = `Période du ${startStr} au ${endStr}`;
+        pdfHeader.classList.remove('hidden');
 
-    const startStr = document.getElementById('date-debut').value;
-    const endStr = document.getElementById('date-fin').value;
-    pdfDates.textContent = `Période du ${startStr} au ${endStr}`;
-    pdfHeader.classList.remove('hidden');
+        const opt = {
+            margin:       10,
+            filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0f172a' },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
 
-    // Options du PDF
-    const opt = {
-        margin:       10,
-        filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0f172a' },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
+        btn.disabled = true;
 
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
-    btn.disabled = true;
-
-    // Création du PDF
-    html2pdf().set(opt).from(element).save().then(() => {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        pdfHeader.classList.add('hidden'); // On recache l'en-tête interne
+        html2pdf().set(opt).from(element).save().then(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            pdfHeader.classList.add('hidden');
+        });
     });
-});
+}
 
 generateReport();
