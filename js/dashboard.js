@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyA5RLJI5ahBhZKGQNLXCFWIEnRxx0MNN44",
@@ -15,28 +15,151 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ==========================================
-// SYSTÈME DE MISE À JOUR FORCÉE
-const APP_VERSION = "2.4"; // Version unifiée pour toutes les pages
+// Passage à la version 2.5 !
+const APP_VERSION = "2.5";
 
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
-    // 1. On vide la mémoire cache du téléphone pour forcer le nouveau code
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
-    // 2. On mémorise la nouvelle version
     localStorage.setItem("zeina_version", APP_VERSION);
-    // 3. On force la déconnexion et on renvoie à l'accueil
-    signOut(auth).then(() => {
-        window.location.replace("index.html");
-    });
+    signOut(auth).then(() => { window.location.replace("index.html"); });
 }
-// ==========================================
-
 
 onAuthStateChanged(auth, (user) => {
-    if (!user) window.location.href = "index.html";
+    if (!user) {
+        window.location.href = "index.html";
+    } else {
+        // Lancement de la vérification des nouveautés à la connexion
+        checkAndShowWelcomeModal();
+    }
 });
+
+document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
+    signOut(auth).then(() => window.location.href = "index.html");
+});
+
+// =========================================================================
+// LOGIQUE DE LA FENÊTRE DE BIENVENUE ET DES NOUVEAUTÉS
+// =========================================================================
+async function checkAndShowWelcomeModal() {
+    const welcomeModal = document.getElementById('welcome-modal');
+    if (!welcomeModal) return;
+
+    const lastVisitStr = localStorage.getItem('zeina_last_visit');
+    const lastNotifiedVersion = localStorage.getItem('zeina_notified_version');
+    const now = new Date();
+
+    let showUpdates = false;
+    let showActivities = false;
+
+    // 1. Liste des mises à jour (Tu pourras modifier ce texte pour tes futures versions !)
+    const changelog = {
+        "2.5": [
+            "Nouvelle fenêtre affichant l'activité des autres membres depuis votre dernière visite.",
+            "Amélioration des performances de la base de données.",
+            "Exportation PDF HD 100% fonctionnelle sur mobile."
+        ]
+    };
+
+    const updatesListEl = document.getElementById('welcome-updates-list');
+
+    // Si c'est une nouvelle mise à jour, on affiche le bloc
+    if (lastNotifiedVersion !== APP_VERSION) {
+        const notes = changelog[APP_VERSION] || ["Amélioration des performances et correction de bugs."];
+        updatesListEl.innerHTML = notes.map(n => `<li>${n}</li>`).join('');
+        document.getElementById('welcome-updates-section').classList.remove('hidden');
+        showUpdates = true;
+    }
+
+    // 2. Recherche de l'activité depuis la dernière visite
+    if (lastVisitStr) {
+        const lastVisit = new Date(lastVisitStr);
+        const events = [];
+
+        try {
+            // On récupère d'abord les noms pour que l'affichage soit propre
+            const materielMap = {};
+            const matSnap = await getDocs(collection(db, "materiel"));
+            matSnap.forEach(d => materielMap[d.id] = d.data().nom);
+
+            const medMap = {};
+            const medSnap = await getDocs(collection(db, "medicaments"));
+            medSnap.forEach(d => medMap[d.id] = d.data().nom);
+
+            // Recherche des Prêts récents
+            const snapPrets = await getDocs(query(collection(db, "prets"), where("datePret", ">", lastVisit)));
+            snapPrets.forEach(d => {
+                const data = d.data();
+                events.push({ date: data.datePret.toDate(), text: `<strong>Prêt : ${materielMap[data.materielId] || 'Matériel'}</strong><br>À ${data.patientNom} par <span class="text-blue-300">${data.membreEmail}</span>`, icon: "fa-hand-holding-heart text-blue-400" });
+            });
+
+            // Recherche des Retours récents
+            const snapRetours = await getDocs(query(collection(db, "retours"), where("dateRetour", ">", lastVisit)));
+            snapRetours.forEach(d => {
+                const data = d.data();
+                events.push({ date: data.dateRetour.toDate(), text: `<strong>Retour : ${materielMap[data.materielId] || 'Matériel'}</strong><br>Validé par <span class="text-emerald-300">${data.membreEmail}</span>`, icon: "fa-boxes-packing text-emerald-400" });
+            });
+
+            // Recherche de la Pharmacie récente
+            const snapMeds = await getDocs(query(collection(db, "historique_medicaments"), where("date", ">", lastVisit)));
+            snapMeds.forEach(d => {
+                const data = d.data();
+                const nomMed = medMap[data.medicamentId] || 'Médicament';
+                if (data.type === "distribution") {
+                    events.push({ date: data.date.toDate(), text: `<strong>Don : ${nomMed}</strong> (-${data.quantite})<br>À ${data.beneficiaire} par <span class="text-amber-300">${data.membreEmail}</span>`, icon: "fa-pills text-amber-400" });
+                } else if (data.type === "ajout_stock") {
+                    events.push({ date: data.date.toDate(), text: `<strong>Ajout Stock : ${nomMed}</strong> (+${data.quantite})<br>Par <span class="text-purple-300">${data.membreEmail}</span>`, icon: "fa-boxes-stacked text-purple-400" });
+                }
+            });
+
+            if (events.length > 0) {
+                showActivities = true;
+                document.getElementById('welcome-activity-section').classList.remove('hidden');
+
+                events.sort((a, b) => b.date - a.date); // Trier du plus récent au plus ancien
+
+                document.getElementById('welcome-activity-list').innerHTML = events.slice(0, 8).map(ev => `
+                    <div class="flex items-start gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 shadow-sm">
+                        <div class="mt-1 text-lg"><i class="fa-solid ${ev.icon}"></i></div>
+                        <div>
+                            <p class="text-sm text-slate-200 leading-snug">${ev.text}</p>
+                            <p class="text-[10px] text-slate-500 mt-1 uppercase tracking-wide">${ev.date.toLocaleString('fr-FR', {day: '2-digit', month:'short', hour:'2-digit', minute:'2-digit'})}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                if(!showUpdates) document.getElementById('welcome-empty-state').classList.remove('hidden');
+            }
+        } catch(e) {
+            console.error("Erreur historique:", e);
+        }
+    } else {
+        // Première visite absolue sur ce navigateur
+        if(!showUpdates) {
+            showUpdates = true;
+            updatesListEl.innerHTML = "<li>Bienvenue sur votre espace de gestion associatif !</li>";
+            document.getElementById('welcome-updates-section').classList.remove('hidden');
+        }
+    }
+
+    // On affiche la modale s'il y a quelque chose à dire
+    if (showUpdates || showActivities || !lastVisitStr) {
+        welcomeModal.classList.remove('hidden');
+    }
+
+    // Fonction de fermeture : on sauvegarde la date ACTUELLE
+    const closeModal = () => {
+        welcomeModal.classList.add('hidden');
+        localStorage.setItem('zeina_last_visit', now.toISOString());
+        localStorage.setItem('zeina_notified_version', APP_VERSION);
+    };
+
+    document.getElementById('close-welcome-modal').addEventListener('click', closeModal);
+    document.getElementById('btn-welcome-ok').addEventListener('click', closeModal);
+}
+// =========================================================================
+
 
 let allMateriel = [];
 let currentFilter = "all";
@@ -44,89 +167,91 @@ let searchQuery = "";
 let currentItemId;
 let currentItemRef;
 
-document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
-    signOut(auth).then(() => window.location.href = "index.html");
-});
-
 // --- Logique d'affichage et d'impression du QR après création ---
 const qrSuccessModal = document.getElementById('qr-success-modal');
 const qrSuccessBox = document.getElementById('qr-success-box');
 const qrSuccessName = document.getElementById('qr-success-name');
 const qrSuccessRef = document.getElementById('qr-success-ref');
 
-document.getElementById('btn-close-success').addEventListener('click', () => {
-    qrSuccessModal.classList.add('hidden');
-});
+if (document.getElementById('btn-close-success')) {
+    document.getElementById('btn-close-success').addEventListener('click', () => {
+        qrSuccessModal.classList.add('hidden');
+    });
+}
 
-// Fonction pour imprimer le QR Code propre
-document.getElementById('btn-print-qr').addEventListener('click', () => {
-    const canvas = qrSuccessBox.querySelector('canvas');
-    if(!canvas) return;
-    const qrImage = canvas.toDataURL("image/png");
+if (document.getElementById('btn-print-qr')) {
+    document.getElementById('btn-print-qr').addEventListener('click', () => {
+        const canvas = qrSuccessBox.querySelector('canvas');
+        if(!canvas) return;
+        const qrImage = canvas.toDataURL("image/png");
 
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-        <head><title>Impression Etiquette</title></head>
-        <body style="text-align: center; font-family: Arial, sans-serif; padding-top: 20px;">
-            <h2 style="margin-bottom: 5px;">${qrSuccessName.textContent}</h2>
-            <p style="font-size: 18px; color: #555; margin-top: 0;">Réf: <strong>${qrSuccessRef.textContent}</strong></p>
-            <img src="${qrImage}" style="margin: 20px auto; display: block; width: 150px; height: 150px;" />
-            <p style="font-size: 12px; color: #888;">La Lumière de l'Ange Zeïna</p>
-            <script>
-                window.onload = function() { setTimeout(() => { window.print(); window.close(); }, 500); }
-            <\/script>
-        </body>
-        </html>
-    `);
-    printWindow.document.close();
-});
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+            <head><title>Impression Etiquette</title></head>
+            <body style="text-align: center; font-family: Arial, sans-serif; padding-top: 20px;">
+                <h2 style="margin-bottom: 5px;">${qrSuccessName.textContent}</h2>
+                <p style="font-size: 18px; color: #555; margin-top: 0;">Réf: <strong>${qrSuccessRef.textContent}</strong></p>
+                <img src="${qrImage}" style="margin: 20px auto; display: block; width: 150px; height: 150px;" />
+                <p style="font-size: 12px; color: #888;">La Lumière de l'Ange Zeïna</p>
+                <script>
+                    window.onload = function() { setTimeout(() => { window.print(); window.close(); }, 500); }
+                <\/script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    });
+}
 
 const addItemForm = document.getElementById('add-item-form');
-addItemForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = document.getElementById('item-name').value;
-    const ref = document.getElementById('item-ref').value;
-    const submitBtn = addItemForm.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Ajout...';
-    submitBtn.disabled = true;
+if (addItemForm) {
+    addItemForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('item-name').value;
+        const ref = document.getElementById('item-ref').value;
+        const submitBtn = addItemForm.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Ajout...';
+        submitBtn.disabled = true;
 
-    try {
-        await addDoc(collection(db, "materiel"), { nom: name, reference: ref, statut: "Disponible", dateAjout: new Date() });
-        addItemForm.reset();
+        try {
+            await addDoc(collection(db, "materiel"), { nom: name, reference: ref, statut: "Disponible", dateAjout: new Date() });
+            addItemForm.reset();
 
-        // Affichage de la fenêtre QR Code
-        qrSuccessName.textContent = name;
-        qrSuccessRef.textContent = ref;
-        qrSuccessBox.innerHTML = ""; // On nettoie l'ancien QR
-        new QRCode(qrSuccessBox, {
-            text: ref, // On encode uniquement la référence
-            width: 150,
-            height: 150,
-            colorDark : "#0f172a",
-            colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.H
-        });
-        qrSuccessModal.classList.remove('hidden');
+            qrSuccessName.textContent = name;
+            qrSuccessRef.textContent = ref;
+            qrSuccessBox.innerHTML = "";
+            new QRCode(qrSuccessBox, {
+                text: ref,
+                width: 150,
+                height: 150,
+                colorDark : "#0f172a",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+            qrSuccessModal.classList.remove('hidden');
 
-    } catch (error) {
-        alert("Erreur lors de l'ajout : " + error.message);
-    } finally {
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-    }
-});
+        } catch (error) {
+            alert("Erreur lors de l'ajout : " + error.message);
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+}
 
 function enleverAccents(texte) {
     if (!texte) return "";
     return String(texte).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-document.getElementById('search-bar').addEventListener('input', (e) => {
-    searchQuery = enleverAccents(e.target.value);
-    renderInventory();
-});
+if (document.getElementById('search-bar')) {
+    document.getElementById('search-bar').addEventListener('input', (e) => {
+        searchQuery = enleverAccents(e.target.value);
+        renderInventory();
+    });
+}
 
 const btnFilterAll = document.getElementById('filter-all');
 const btnFilterAvailable = document.getElementById('filter-available');
@@ -134,6 +259,7 @@ const btnFilterLoaned = document.getElementById('filter-loaned');
 const btnFilterRepair = document.getElementById('filter-repair');
 
 function updateFilterUI(activeBtn) {
+    if(!btnFilterAll) return;
     [btnFilterAll, btnFilterAvailable, btnFilterLoaned, btnFilterRepair].forEach(btn => {
         btn.classList.remove('bg-slate-700', 'text-white', 'shadow-md');
         btn.classList.add('text-slate-400');
@@ -142,14 +268,17 @@ function updateFilterUI(activeBtn) {
     activeBtn.classList.add('bg-slate-700', 'text-white', 'shadow-md');
 }
 
-btnFilterAll.addEventListener('click', () => { currentFilter = "all"; updateFilterUI(btnFilterAll); renderInventory(); });
-btnFilterAvailable.addEventListener('click', () => { currentFilter = "Disponible"; updateFilterUI(btnFilterAvailable); renderInventory(); });
-btnFilterLoaned.addEventListener('click', () => { currentFilter = "En prêt"; updateFilterUI(btnFilterLoaned); renderInventory(); });
-btnFilterRepair.addEventListener('click', () => { currentFilter = "En réparation"; updateFilterUI(btnFilterRepair); renderInventory(); });
+if (btnFilterAll) {
+    btnFilterAll.addEventListener('click', () => { currentFilter = "all"; updateFilterUI(btnFilterAll); renderInventory(); });
+    btnFilterAvailable.addEventListener('click', () => { currentFilter = "Disponible"; updateFilterUI(btnFilterAvailable); renderInventory(); });
+    btnFilterLoaned.addEventListener('click', () => { currentFilter = "En prêt"; updateFilterUI(btnFilterLoaned); renderInventory(); });
+    btnFilterRepair.addEventListener('click', () => { currentFilter = "En réparation"; updateFilterUI(btnFilterRepair); renderInventory(); });
+}
 
 const inventoryList = document.getElementById('inventory-list');
 
 function renderInventory() {
+    if (!inventoryList) return;
     inventoryList.innerHTML = "";
 
     const filteredList = allMateriel.filter(item => {
@@ -262,34 +391,38 @@ const btnScanQr = document.getElementById('btn-scan-qr');
 const closeQrModalBtn = document.getElementById('close-qr-modal');
 const searchBar = document.getElementById('search-bar');
 
-btnScanQr.addEventListener('click', () => {
-    qrModal.classList.remove('hidden');
-    html5QrcodeScanner = new Html5Qrcode("qr-reader");
-    html5QrcodeScanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-            html5QrcodeScanner.stop().then(() => {
-                qrModal.classList.add('hidden');
-                searchBar.value = decodedText;
-                searchQuery = enleverAccents(decodedText);
-                renderInventory();
-            }).catch(err => console.error(err));
-        },
-        (errorMessage) => { }
-    ).catch(err => {
-        alert("Erreur d'accès à la caméra. Vérifiez les autorisations sur Vercel.");
-        qrModal.classList.add('hidden');
+if (btnScanQr) {
+    btnScanQr.addEventListener('click', () => {
+        qrModal.classList.remove('hidden');
+        html5QrcodeScanner = new Html5Qrcode("qr-reader");
+        html5QrcodeScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+                html5QrcodeScanner.stop().then(() => {
+                    qrModal.classList.add('hidden');
+                    searchBar.value = decodedText;
+                    searchQuery = enleverAccents(decodedText);
+                    renderInventory();
+                }).catch(err => console.error(err));
+            },
+            (errorMessage) => { }
+        ).catch(err => {
+            alert("Erreur d'accès à la caméra. Vérifiez les autorisations sur Vercel.");
+            qrModal.classList.add('hidden');
+        });
     });
-});
+}
 
-closeQrModalBtn.addEventListener('click', () => {
-    if (html5QrcodeScanner) {
-        html5QrcodeScanner.stop().then(() => qrModal.classList.add('hidden')).catch(err => qrModal.classList.add('hidden'));
-    } else {
-        qrModal.classList.add('hidden');
-    }
-});
+if(closeQrModalBtn) {
+    closeQrModalBtn.addEventListener('click', () => {
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.stop().then(() => qrModal.classList.add('hidden')).catch(err => qrModal.classList.add('hidden'));
+        } else {
+            qrModal.classList.add('hidden');
+        }
+    });
+}
 
 function genererBonDePretPDF(equipementNom, equipementRef, infosPret) {
     const { jsPDF } = window.jspdf;
@@ -364,22 +497,26 @@ const returnModalItemName = document.getElementById('return-modal-item-name');
 const noPhotoReturn = document.getElementById('no-photo-return');
 const returnPhoto = document.getElementById('return-photo');
 
-function closeLoan() { loanModal.classList.add('hidden'); loanForm.reset(); equipmentPhoto.disabled = false; }
-function closeReturn() { returnModal.classList.add('hidden'); returnForm.reset(); returnPhoto.disabled = false; }
+function closeLoan() { if(loanModal) loanModal.classList.add('hidden'); if(loanForm) loanForm.reset(); if(equipmentPhoto) equipmentPhoto.disabled = false; }
+function closeReturn() { if(returnModal) returnModal.classList.add('hidden'); if(returnForm) returnForm.reset(); if(returnPhoto) returnPhoto.disabled = false; }
 
-closeLoanBtn.addEventListener('click', closeLoan);
-closeLoanIcon.addEventListener('click', closeLoan);
-closeReturnBtn.addEventListener('click', closeReturn);
-closeReturnIcon.addEventListener('click', closeReturn);
+if(closeLoanBtn) closeLoanBtn.addEventListener('click', closeLoan);
+if(closeLoanIcon) closeLoanIcon.addEventListener('click', closeLoan);
+if(closeReturnBtn) closeReturnBtn.addEventListener('click', closeReturn);
+if(closeReturnIcon) closeReturnIcon.addEventListener('click', closeReturn);
 
-noPhotoLoan.addEventListener('change', (e) => {
-    equipmentPhoto.disabled = e.target.checked;
-    if(e.target.checked) equipmentPhoto.value = "";
-});
-noPhotoReturn.addEventListener('change', (e) => {
-    returnPhoto.disabled = e.target.checked;
-    if(e.target.checked) returnPhoto.value = "";
-});
+if(noPhotoLoan) {
+    noPhotoLoan.addEventListener('change', (e) => {
+        equipmentPhoto.disabled = e.target.checked;
+        if(e.target.checked) equipmentPhoto.value = "";
+    });
+}
+if(noPhotoReturn) {
+    noPhotoReturn.addEventListener('change', (e) => {
+        returnPhoto.disabled = e.target.checked;
+        if(e.target.checked) returnPhoto.value = "";
+    });
+}
 
 async function uploadToCloudinary(file) {
     const formData = new FormData();
@@ -390,93 +527,97 @@ async function uploadToCloudinary(file) {
     return data.secure_url;
 }
 
-loanForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const file = equipmentPhoto.files[0];
-    const isNoPhoto = noPhotoLoan.checked;
+if (loanForm) {
+    loanForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const file = equipmentPhoto.files[0];
+        const isNoPhoto = noPhotoLoan.checked;
 
-    if (!file && !isNoPhoto) return alert("Veuillez prendre une photo, ou cocher la case si c'est impossible.");
+        if (!file && !isNoPhoto) return alert("Veuillez prendre une photo, ou cocher la case si c'est impossible.");
 
-    const submitBtn = loanForm.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Validation...';
-    submitBtn.disabled = true;
+        const submitBtn = loanForm.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Validation...';
+        submitBtn.disabled = true;
 
-    try {
-        const loanData = {
-            dateDebutPret: document.getElementById('loan-date').value,
-            membreNom: document.getElementById('member-name').value,
-            patientPieceId: document.getElementById('patient-id').value,
-            patientNom: document.getElementById('patient-name').value,
-            patientTelephone: document.getElementById('patient-phone').value,
-            patientDateNaissance: document.getElementById('patient-dob').value,
-            duree: document.getElementById('loan-duration').value
-        };
+        try {
+            const loanData = {
+                dateDebutPret: document.getElementById('loan-date').value,
+                membreNom: document.getElementById('member-name').value,
+                patientPieceId: document.getElementById('patient-id').value,
+                patientNom: document.getElementById('patient-name').value,
+                patientTelephone: document.getElementById('patient-phone').value,
+                patientDateNaissance: document.getElementById('patient-dob').value,
+                duree: document.getElementById('loan-duration').value
+            };
 
-        let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
-        if (file && !isNoPhoto) {
-            imageUrl = await uploadToCloudinary(file);
+            let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
+            if (file && !isNoPhoto) {
+                imageUrl = await uploadToCloudinary(file);
+            }
+
+            await addDoc(collection(db, "prets"), {
+                materielId: currentItemId,
+                dateDebutPret: loanData.dateDebutPret,
+                membreNom: loanData.membreNom,
+                patientPieceId: loanData.patientPieceId,
+                patientNom: loanData.patientNom,
+                patientTelephone: loanData.patientTelephone,
+                patientDateNaissance: loanData.patientDateNaissance,
+                duree: loanData.duree,
+                photoSortie: imageUrl,
+                datePret: new Date(),
+                membreEmail: auth.currentUser ? auth.currentUser.email : "Email introuvable"
+            });
+
+            await updateDoc(doc(db, "materiel", currentItemId), { statut: "En prêt" });
+
+            genererBonDePretPDF(modalItemName.textContent, currentItemRef, loanData);
+
+            closeLoan();
+        } catch (error) {
+            alert("Erreur lors du prêt : " + error.message);
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
         }
+    });
+}
 
-        await addDoc(collection(db, "prets"), {
-            materielId: currentItemId,
-            dateDebutPret: loanData.dateDebutPret,
-            membreNom: loanData.membreNom,
-            patientPieceId: loanData.patientPieceId,
-            patientNom: loanData.patientNom,
-            patientTelephone: loanData.patientTelephone,
-            patientDateNaissance: loanData.patientDateNaissance,
-            duree: loanData.duree,
-            photoSortie: imageUrl,
-            datePret: new Date(),
-            membreEmail: auth.currentUser ? auth.currentUser.email : "Email introuvable"
-        });
+if (returnForm) {
+    returnForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const file = returnPhoto.files[0];
+        const isNoPhoto = noPhotoReturn.checked;
 
-        await updateDoc(doc(db, "materiel", currentItemId), { statut: "En prêt" });
+        if (!file && !isNoPhoto) return alert("Veuillez prendre une photo, ou cocher la case si c'est impossible.");
 
-        genererBonDePretPDF(modalItemName.textContent, currentItemRef, loanData);
+        const submitBtn = returnForm.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Envoi...';
+        submitBtn.disabled = true;
 
-        closeLoan();
-    } catch (error) {
-        alert("Erreur lors du prêt : " + error.message);
-    } finally {
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-    }
-});
+        try {
+            let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
 
-returnForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const file = returnPhoto.files[0];
-    const isNoPhoto = noPhotoReturn.checked;
+            if (file && !isNoPhoto) {
+                imageUrl = await uploadToCloudinary(file);
+            }
 
-    if (!file && !isNoPhoto) return alert("Veuillez prendre une photo, ou cocher la case si c'est impossible.");
+            await addDoc(collection(db, "retours"), {
+                materielId: currentItemId,
+                photoRetour: imageUrl,
+                dateRetour: new Date(),
+                membreEmail: auth.currentUser ? auth.currentUser.email : "Email introuvable"
+            });
 
-    const submitBtn = returnForm.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Envoi...';
-    submitBtn.disabled = true;
-
-    try {
-        let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
-
-        if (file && !isNoPhoto) {
-            imageUrl = await uploadToCloudinary(file);
+            await updateDoc(doc(db, "materiel", currentItemId), { statut: "Disponible" });
+            closeReturn();
+        } catch (error) {
+            alert("Erreur lors du retour : " + error.message);
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
         }
-
-        await addDoc(collection(db, "retours"), {
-            materielId: currentItemId,
-            photoRetour: imageUrl,
-            dateRetour: new Date(),
-            membreEmail: auth.currentUser ? auth.currentUser.email : "Email introuvable"
-        });
-
-        await updateDoc(doc(db, "materiel", currentItemId), { statut: "Disponible" });
-        closeReturn();
-    } catch (error) {
-        alert("Erreur lors du retour : " + error.message);
-    } finally {
-        submitBtn.innerHTML = originalText;
-        submitBtn.disabled = false;
-    }
-});
+    });
+}
