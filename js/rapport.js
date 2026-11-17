@@ -15,9 +15,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ==========================================
-// SYSTÈME DE MISE À JOUR (SANS DÉCONNEXION)
-const APP_VERSION = "2.6";
+// Version 2.7
+const APP_VERSION = "2.7";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
@@ -25,7 +24,6 @@ if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     localStorage.setItem("zeina_version", APP_VERSION);
     console.log("Mise à jour vers la version " + APP_VERSION);
 }
-// ==========================================
 
 onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
@@ -178,7 +176,9 @@ async function generateReport() {
     }
 }
 
-// MOTEUR PDF
+// =========================================================================
+// MOTEUR PDF DÉFINITIF : 100% EN MÉMOIRE (INVISIBLE À L'ÉCRAN)
+// =========================================================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
     btnDownloadPdf.addEventListener('click', () => {
@@ -213,8 +213,10 @@ if(btnDownloadPdf) {
             }).join('');
         }
 
+        // Code HTML ultra propre avec largeur fixe
         const htmlString = `
-        <div id="pdf-export-layer" style="width: 794px; background: white; padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
+        <div style="width: 794px; background: white; padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
+            
             <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px;">
                 <h1 style="color: #1e293b; font-size: 26px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
                 <h2 style="color: #64748b; font-size: 18px; margin: 6px 0 0 0;">Rapport d'activité détaillé</h2>
@@ -262,36 +264,29 @@ if(btnDownloadPdf) {
         </div>
         `;
 
-        const pdfWrapper = document.createElement('div');
-        pdfWrapper.innerHTML = htmlString;
-        pdfWrapper.style.position = 'absolute';
-        pdfWrapper.style.top = '0';
-        pdfWrapper.style.left = '0';
-        pdfWrapper.style.width = '794px';
-        pdfWrapper.style.zIndex = '-10';
+        // CRÉATION DE L'ÉLÉMENT MAIS SANS L'AJOUTER AU NAVIGATEUR VISUEL (document.body)
+        const tempElement = document.createElement('div');
+        tempElement.innerHTML = htmlString;
 
-        document.body.appendChild(pdfWrapper);
-
+        // "windowWidth: 800" oblige le téléphone à générer le PDF avec une largeur PC
         const opt = {
             margin:       10,
             filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true },
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
         btn.disabled = true;
 
-        html2pdf().set(opt).from(pdfWrapper).save().then(() => {
+        html2pdf().set(opt).from(tempElement).save().then(() => {
             btn.innerHTML = originalText;
             btn.disabled = false;
-            document.body.removeChild(pdfWrapper);
         }).catch(err => {
             console.error("Erreur PDF:", err);
             btn.innerHTML = originalText;
             btn.disabled = false;
-            document.body.removeChild(pdfWrapper);
             alert("Erreur lors de la création du PDF.");
         });
     });
