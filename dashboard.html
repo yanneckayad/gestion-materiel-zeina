@@ -5,16 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registre - La Lumière de l'Ange Zeïna</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Importation des icônes FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Animations personnalisées -->
     <style>
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-pop-in { animation: popIn 0.3s ease-out forwards; }
 
-        /* Personnalisation de la barre de défilement (scroll) */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -23,7 +20,6 @@
 </head>
 <body class="bg-slate-900 text-slate-200 min-h-screen relative selection:bg-blue-500/30">
 
-<!-- Barre de navigation -->
 <nav class="bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-800 p-4 shadow-lg">
     <div class="max-w-7xl mx-auto flex justify-between items-center">
         <div class="font-black text-2xl flex items-center gap-3 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent tracking-tight">
@@ -37,7 +33,7 @@
 
 <main class="p-4 sm:p-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-    <!-- Colonne de gauche : Formulaire d'ajout -->
+    <!-- Formulaire d'ajout -->
     <div class="col-span-1 bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl h-fit hover:border-slate-600 transition-colors duration-300">
         <h2 class="text-xl font-bold mb-6 flex items-center gap-2 text-white">
             <i class="fa-solid fa-box-open text-blue-400"></i> Nouveau matériel
@@ -57,29 +53,38 @@
                     <input type="text" id="item-ref" placeholder="Ex: FR-01" class="w-full pl-10 pr-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all" required>
                 </div>
             </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2">
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2">
                 <i class="fa-solid fa-plus"></i> Enregistrer
             </button>
         </form>
     </div>
 
-    <!-- Colonne de droite : Liste du matériel -->
+    <!-- Inventaire -->
     <div class="col-span-1 lg:col-span-2 bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-            <h2 class="text-xl font-bold flex items-center gap-2 text-white">
+
+        <!-- NOUVEL EN-TÊTE AVEC RECHERCHE ET FILTRES -->
+        <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-4">
+            <h2 class="text-xl font-bold flex items-center gap-2 text-white whitespace-nowrap">
                 <i class="fa-solid fa-clipboard-list text-emerald-400"></i> Inventaire
             </h2>
 
-            <!-- Boutons de filtrage stylisés -->
-            <div class="flex space-x-1 bg-slate-900/80 p-1.5 rounded-xl border border-slate-700 w-full sm:w-auto overflow-x-auto">
-                <button id="filter-all" class="flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-lg bg-slate-700 text-white shadow-md transition-all"><i class="fa-solid fa-layer-group mr-1.5"></i>Tous</button>
-                <button id="filter-available" class="flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"><i class="fa-solid fa-check mr-1.5"></i>Dispos</button>
-                <button id="filter-loaned" class="flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"><i class="fa-solid fa-hand-holding-heart mr-1.5"></i>Prêtés</button>
+            <div class="flex flex-col sm:flex-row w-full xl:w-auto gap-3">
+                <!-- Barre de recherche -->
+                <div class="relative w-full sm:w-64">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                    <input type="text" id="search-bar" placeholder="Rechercher (nom, réf...)" class="w-full pl-9 pr-3 py-2 bg-slate-900/80 text-white border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-sm">
+                </div>
+
+                <!-- Boutons de filtrage -->
+                <div class="flex space-x-1 bg-slate-900/80 p-1.5 rounded-xl border border-slate-700 w-full sm:w-auto overflow-x-auto">
+                    <button id="filter-all" class="flex-1 sm:flex-none px-4 py-1.5 text-sm font-semibold rounded-lg bg-slate-700 text-white shadow-md transition-all"><i class="fa-solid fa-layer-group mr-1.5"></i>Tous</button>
+                    <button id="filter-available" class="flex-1 sm:flex-none px-4 py-1.5 text-sm font-semibold rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"><i class="fa-solid fa-check mr-1.5"></i>Dispos</button>
+                    <button id="filter-loaned" class="flex-1 sm:flex-none px-4 py-1.5 text-sm font-semibold rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"><i class="fa-solid fa-hand-holding-heart mr-1.5"></i>Prêtés</button>
+                </div>
             </div>
         </div>
 
         <div id="inventory-list" class="space-y-4">
-            <!-- Chargement initial -->
             <div class="animate-pulse flex items-center justify-center py-10 text-slate-500 gap-3">
                 <i class="fa-solid fa-spinner fa-spin text-xl"></i> Récupération des données...
             </div>
@@ -111,9 +116,7 @@
                     <input type="text" id="member-name" placeholder="Ton nom" class="w-full px-3 py-2 bg-slate-900/50 text-white border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500/50" required>
                 </div>
             </div>
-
             <hr class="border-slate-700 my-4">
-
             <div>
                 <label for="patient-id" class="block text-sm font-medium text-slate-400 mb-1"><i class="fa-regular fa-id-card mr-1"></i> N° Pièce d'identité</label>
                 <input type="text" id="patient-id" placeholder="N° CNI ou Passeport" class="w-full px-3 py-2 bg-slate-900/50 text-white border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500/50" required>
@@ -139,7 +142,6 @@
                     <option value="Longue">Longue durée (> 30 jours)</option>
                 </select>
             </div>
-
             <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
                 <label for="equipment-photo" class="block text-sm font-medium text-slate-300 mb-2"><i class="fa-solid fa-camera mr-1"></i> Photo de l'état de sortie</label>
                 <input type="file" id="equipment-photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 disabled:opacity-50 transition-all">
@@ -148,7 +150,6 @@
                     <label for="no-photo-loan" class="ml-2 text-sm text-slate-300 cursor-pointer">Pas de photo (ancien prêt papier)</label>
                 </div>
             </div>
-
             <div class="flex space-x-3 pt-4">
                 <button type="button" id="close-modal-btn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 rounded-xl transition-colors">Annuler</button>
                 <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/25 hover:-translate-y-0.5 transition-all">Valider le prêt</button>
@@ -164,11 +165,9 @@
             <h2 class="text-2xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-truck-ramp-box text-emerald-400"></i> Retour matériel</h2>
             <button id="close-return-icon-btn" class="text-slate-400 hover:text-white transition-colors"><i class="fa-solid fa-xmark text-xl"></i></button>
         </div>
-
         <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 mb-6">
             <p id="return-modal-item-name" class="text-emerald-400 font-semibold text-center text-lg"></p>
         </div>
-
         <form id="return-form" class="space-y-4">
             <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
                 <label for="return-photo" class="block text-sm font-medium text-slate-300 mb-2"><i class="fa-solid fa-camera mr-1"></i> Photo de l'état de retour</label>

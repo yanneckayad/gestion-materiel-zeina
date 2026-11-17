@@ -2,7 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Ta configuration Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyA5RLJI5ahBhZKGQNLXCFWIEnRxx0MNN44",
     authDomain: "zeina-materiel.firebaseapp.com",
@@ -16,16 +15,15 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- Sécurité : Vérifie si l'utilisateur est bien connecté ---
 onAuthStateChanged(auth, (user) => {
-    if (!user) {
-        // Si personne n'est connecté, on le renvoie à l'accueil
-        window.location.href = "index.html";
-    }
+    if (!user) window.location.href = "index.html";
 });
 
+// Variables globales remontées en haut pour éviter l'erreur "Unresolved"
 let allMateriel = [];
 let currentFilter = "all";
+let searchQuery = "";
+let currentItemId; // "Variable initializer is redundant" corrigé
 
 document.getElementById('logout-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
@@ -36,8 +34,6 @@ addItemForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('item-name').value;
     const ref = document.getElementById('item-ref').value;
-
-    // Animation du bouton pendant l'envoi
     const submitBtn = addItemForm.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Ajout...';
@@ -52,6 +48,11 @@ addItemForm.addEventListener('submit', async (e) => {
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
+});
+
+document.getElementById('search-bar').addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase();
+    renderInventory();
 });
 
 const btnFilterAll = document.getElementById('filter-all');
@@ -75,22 +76,25 @@ const inventoryList = document.getElementById('inventory-list');
 
 function renderInventory() {
     inventoryList.innerHTML = "";
-    const filteredList = allMateriel.filter(item => currentFilter === "all" || item.data.statut === currentFilter);
+
+    const filteredList = allMateriel.filter(item => {
+        const matchStatus = currentFilter === "all" || item.data.statut === currentFilter;
+        const matchSearch = item.data.nom.toLowerCase().includes(searchQuery) ||
+            item.data.reference.toLowerCase().includes(searchQuery);
+        return matchStatus && matchSearch;
+    });
 
     if (filteredList.length === 0) {
-        inventoryList.innerHTML = '<div class="text-center py-10 text-slate-500 animate-fade-in"><i class="fa-solid fa-box-open text-4xl mb-3 opacity-50"></i><p>Aucun matériel trouvé dans cette catégorie.</p></div>';
+        inventoryList.innerHTML = '<div class="text-center py-10 text-slate-500 animate-fade-in"><i class="fa-solid fa-magnifying-glass text-4xl mb-3 opacity-50"></i><p>Aucun matériel trouvé.</p></div>';
         return;
     }
 
-    // On ajoute un petit délai (index) pour faire apparaître les lignes en cascade
     filteredList.forEach((item, index) => {
         const data = item.data;
         const itemId = item.id;
         const itemElement = document.createElement('div');
-
-        // Classes de la carte (Hover effects et animation fade-in)
         itemElement.className = "animate-fade-in bg-slate-900/40 p-4 sm:p-5 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 border border-slate-700/50 hover:border-slate-500 hover:bg-slate-800/60 shadow-lg hover:shadow-xl transition-all duration-300";
-        itemElement.style.animationDelay = `${index * 0.05}s`; // Effet cascade
+        itemElement.style.animationDelay = `${index * 0.05}s`;
 
         let actionHtml = '';
         let statusBadge = '';
@@ -148,10 +152,9 @@ onSnapshot(collection(db, "materiel"), (snapshot) => {
     renderInventory();
 });
 
-// --- Gestion des Modales et Cases à cocher ---
 const loanModal = document.getElementById('loan-modal');
 const closeLoanBtn = document.getElementById('close-modal-btn');
-const closeLoanIcon = document.getElementById('close-modal-icon-btn'); // Croix en haut
+const closeLoanIcon = document.getElementById('close-modal-icon-btn');
 const loanForm = document.getElementById('loan-form');
 const modalItemName = document.getElementById('modal-item-name');
 const noPhotoLoan = document.getElementById('no-photo-loan');
@@ -159,13 +162,11 @@ const equipmentPhoto = document.getElementById('equipment-photo');
 
 const returnModal = document.getElementById('return-modal');
 const closeReturnBtn = document.getElementById('close-return-modal-btn');
-const closeReturnIcon = document.getElementById('close-return-icon-btn'); // Croix en haut
+const closeReturnIcon = document.getElementById('close-return-icon-btn');
 const returnForm = document.getElementById('return-form');
 const returnModalItemName = document.getElementById('return-modal-item-name');
 const noPhotoReturn = document.getElementById('no-photo-return');
 const returnPhoto = document.getElementById('return-photo');
-
-let currentItemId = null;
 
 function closeLoan() { loanModal.classList.add('hidden'); loanForm.reset(); equipmentPhoto.disabled = false; }
 function closeReturn() { returnModal.classList.add('hidden'); returnForm.reset(); returnPhoto.disabled = false; }
@@ -184,6 +185,16 @@ noPhotoReturn.addEventListener('change', (e) => {
     if(e.target.checked) returnPhoto.value = "";
 });
 
+// --- NOUVEAU : Fonction unique pour envoyer l'image et éviter le "Duplicated code" ---
+async function uploadToCloudinary(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "zeina_photos");
+    const response = await fetch("https://api.cloudinary.com/v1_1/qljytaa3/image/upload", { method: "POST", body: formData });
+    const data = await response.json();
+    return data.secure_url;
+}
+
 loanForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const file = equipmentPhoto.files[0];
@@ -199,13 +210,9 @@ loanForm.addEventListener('submit', async (e) => {
     try {
         let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
 
+        // Utilisation de notre nouvelle fonction raccourcie
         if (file && !isNoPhoto) {
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("upload_preset", "zeina_photos");
-            const cloudinaryResponse = await fetch("https://api.cloudinary.com/v1_1/qljytaa3/image/upload", { method: "POST", body: formData });
-            const cloudinaryData = await cloudinaryResponse.json();
-            imageUrl = cloudinaryData.secure_url;
+            imageUrl = await uploadToCloudinary(file);
         }
 
         await addDoc(collection(db, "prets"), {
@@ -219,7 +226,6 @@ loanForm.addEventListener('submit', async (e) => {
             duree: document.getElementById('loan-duration').value,
             photoSortie: imageUrl,
             datePret: new Date(),
-            // CORRECTION ICI (déjà appliquée)
             membreEmail: auth.currentUser ? auth.currentUser.email : "Email introuvable"
         });
 
@@ -248,20 +254,15 @@ returnForm.addEventListener('submit', async (e) => {
     try {
         let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
 
+        // Utilisation de notre nouvelle fonction raccourcie
         if (file && !isNoPhoto) {
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("upload_preset", "zeina_photos");
-            const cloudinaryResponse = await fetch("https://api.cloudinary.com/v1_1/qljytaa3/image/upload", { method: "POST", body: formData });
-            const cloudinaryData = await cloudinaryResponse.json();
-            imageUrl = cloudinaryData.secure_url;
+            imageUrl = await uploadToCloudinary(file);
         }
 
         await addDoc(collection(db, "retours"), {
             materielId: currentItemId,
             photoRetour: imageUrl,
             dateRetour: new Date(),
-            // CORRECTION ICI (ajoutée pour le retour)
             membreEmail: auth.currentUser ? auth.currentUser.email : "Email introuvable"
         });
 
