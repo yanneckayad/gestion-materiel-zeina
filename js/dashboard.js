@@ -15,22 +15,22 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Passage à la version 2.5 !
-const APP_VERSION = "2.5";
-
+// ==========================================
+// SYSTÈME DE MISE À JOUR (SANS DÉCONNEXION)
+const APP_VERSION = "2.6";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
     localStorage.setItem("zeina_version", APP_VERSION);
-    signOut(auth).then(() => { window.location.replace("index.html"); });
+    console.log("Mise à jour vers la version " + APP_VERSION);
 }
+// ==========================================
 
 onAuthStateChanged(auth, (user) => {
     if (!user) {
         window.location.href = "index.html";
     } else {
-        // Lancement de la vérification des nouveautés à la connexion
         checkAndShowWelcomeModal();
     }
 });
@@ -39,9 +39,7 @@ document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
 });
 
-// =========================================================================
 // LOGIQUE DE LA FENÊTRE DE BIENVENUE ET DES NOUVEAUTÉS
-// =========================================================================
 async function checkAndShowWelcomeModal() {
     const welcomeModal = document.getElementById('welcome-modal');
     if (!welcomeModal) return;
@@ -53,18 +51,16 @@ async function checkAndShowWelcomeModal() {
     let showUpdates = false;
     let showActivities = false;
 
-    // 1. Liste des mises à jour (Tu pourras modifier ce texte pour tes futures versions !)
     const changelog = {
-        "2.5": [
-            "Nouvelle fenêtre affichant l'activité des autres membres depuis votre dernière visite.",
+        "2.6": [
+            "Correction définitive des déconnexions intempestives.",
             "Amélioration des performances de la base de données.",
-            "Exportation PDF HD 100% fonctionnelle sur mobile."
+            "Nouveau design de l'en-tête."
         ]
     };
 
     const updatesListEl = document.getElementById('welcome-updates-list');
 
-    // Si c'est une nouvelle mise à jour, on affiche le bloc
     if (lastNotifiedVersion !== APP_VERSION) {
         const notes = changelog[APP_VERSION] || ["Amélioration des performances et correction de bugs."];
         updatesListEl.innerHTML = notes.map(n => `<li>${n}</li>`).join('');
@@ -72,13 +68,11 @@ async function checkAndShowWelcomeModal() {
         showUpdates = true;
     }
 
-    // 2. Recherche de l'activité depuis la dernière visite
     if (lastVisitStr) {
         const lastVisit = new Date(lastVisitStr);
         const events = [];
 
         try {
-            // On récupère d'abord les noms pour que l'affichage soit propre
             const materielMap = {};
             const matSnap = await getDocs(collection(db, "materiel"));
             matSnap.forEach(d => materielMap[d.id] = d.data().nom);
@@ -87,21 +81,18 @@ async function checkAndShowWelcomeModal() {
             const medSnap = await getDocs(collection(db, "medicaments"));
             medSnap.forEach(d => medMap[d.id] = d.data().nom);
 
-            // Recherche des Prêts récents
             const snapPrets = await getDocs(query(collection(db, "prets"), where("datePret", ">", lastVisit)));
             snapPrets.forEach(d => {
                 const data = d.data();
                 events.push({ date: data.datePret.toDate(), text: `<strong>Prêt : ${materielMap[data.materielId] || 'Matériel'}</strong><br>À ${data.patientNom} par <span class="text-blue-300">${data.membreEmail}</span>`, icon: "fa-hand-holding-heart text-blue-400" });
             });
 
-            // Recherche des Retours récents
             const snapRetours = await getDocs(query(collection(db, "retours"), where("dateRetour", ">", lastVisit)));
             snapRetours.forEach(d => {
                 const data = d.data();
                 events.push({ date: data.dateRetour.toDate(), text: `<strong>Retour : ${materielMap[data.materielId] || 'Matériel'}</strong><br>Validé par <span class="text-emerald-300">${data.membreEmail}</span>`, icon: "fa-boxes-packing text-emerald-400" });
             });
 
-            // Recherche de la Pharmacie récente
             const snapMeds = await getDocs(query(collection(db, "historique_medicaments"), where("date", ">", lastVisit)));
             snapMeds.forEach(d => {
                 const data = d.data();
@@ -117,7 +108,7 @@ async function checkAndShowWelcomeModal() {
                 showActivities = true;
                 document.getElementById('welcome-activity-section').classList.remove('hidden');
 
-                events.sort((a, b) => b.date - a.date); // Trier du plus récent au plus ancien
+                events.sort((a, b) => b.date - a.date);
 
                 document.getElementById('welcome-activity-list').innerHTML = events.slice(0, 8).map(ev => `
                     <div class="flex items-start gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 shadow-sm">
@@ -135,7 +126,6 @@ async function checkAndShowWelcomeModal() {
             console.error("Erreur historique:", e);
         }
     } else {
-        // Première visite absolue sur ce navigateur
         if(!showUpdates) {
             showUpdates = true;
             updatesListEl.innerHTML = "<li>Bienvenue sur votre espace de gestion associatif !</li>";
@@ -143,12 +133,10 @@ async function checkAndShowWelcomeModal() {
         }
     }
 
-    // On affiche la modale s'il y a quelque chose à dire
     if (showUpdates || showActivities || !lastVisitStr) {
         welcomeModal.classList.remove('hidden');
     }
 
-    // Fonction de fermeture : on sauvegarde la date ACTUELLE
     const closeModal = () => {
         welcomeModal.classList.add('hidden');
         localStorage.setItem('zeina_last_visit', now.toISOString());
@@ -158,8 +146,6 @@ async function checkAndShowWelcomeModal() {
     document.getElementById('close-welcome-modal').addEventListener('click', closeModal);
     document.getElementById('btn-welcome-ok').addEventListener('click', closeModal);
 }
-// =========================================================================
-
 
 let allMateriel = [];
 let currentFilter = "all";
@@ -167,7 +153,6 @@ let searchQuery = "";
 let currentItemId;
 let currentItemRef;
 
-// --- Logique d'affichage et d'impression du QR après création ---
 const qrSuccessModal = document.getElementById('qr-success-modal');
 const qrSuccessBox = document.getElementById('qr-success-box');
 const qrSuccessName = document.getElementById('qr-success-name');

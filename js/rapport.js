@@ -15,14 +15,17 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const APP_VERSION = "2.4";
+// ==========================================
+// SYSTÈME DE MISE À JOUR (SANS DÉCONNEXION)
+const APP_VERSION = "2.6";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
     localStorage.setItem("zeina_version", APP_VERSION);
-    signOut(auth).then(() => { window.location.replace("index.html"); });
+    console.log("Mise à jour vers la version " + APP_VERSION);
 }
+// ==========================================
 
 onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
@@ -175,149 +178,122 @@ async function generateReport() {
     }
 }
 
-// =========================================================================
-// GÉNÉRATEUR PDF : AVEC DE MAGNIFIQUES BADGES COLORÉS
-// =========================================================================
+// MOTEUR PDF
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
     btnDownloadPdf.addEventListener('click', () => {
+        const btn = document.getElementById('btn-download-pdf');
+        const originalText = btn.innerHTML;
+
         const startStr = document.getElementById('date-debut').value;
         const endStr = document.getElementById('date-fin').value;
 
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-
-        const cleanText = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
-
-        // En-tête
-        doc.setFontSize(22);
-        doc.setTextColor(37, 99, 235);
-        doc.text("La Lumiere de l'Ange Zeina", 105, 20, { align: "center" });
-
-        doc.setFontSize(14);
-        doc.setTextColor(30, 41, 59);
-        doc.text("RAPPORT D'ACTIVITE DETAILLE", 105, 30, { align: "center" });
-
-        doc.setFontSize(11);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Periode du ${startStr} au ${endStr}`, 105, 38, { align: "center" });
-
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.5);
-        doc.line(15, 45, 195, 45);
-
-        // Blocs Statistiques
-        const startY = 52;
-
-        doc.setDrawColor(191, 219, 254); doc.setFillColor(239, 246, 255);
-        doc.roundedRect(15, startY, 40, 25, 3, 3, "FD");
-        doc.setFontSize(20); doc.setTextColor(37, 99, 235);
-        doc.text(currentStats.prets.toString(), 35, startY + 14, { align: "center" });
-        doc.setFontSize(9); doc.setTextColor(71, 85, 105);
-        doc.text("PRETS", 35, startY + 21, { align: "center" });
-
-        doc.setDrawColor(167, 243, 208); doc.setFillColor(236, 253, 245);
-        doc.roundedRect(59, startY, 40, 25, 3, 3, "FD");
-        doc.setFontSize(20); doc.setTextColor(16, 185, 129);
-        doc.text(currentStats.retours.toString(), 79, startY + 14, { align: "center" });
-        doc.setFontSize(9); doc.setTextColor(71, 85, 105);
-        doc.text("RETOURS", 79, startY + 21, { align: "center" });
-
-        doc.setDrawColor(253, 230, 138); doc.setFillColor(255, 251, 235);
-        doc.roundedRect(103, startY, 42, 25, 3, 3, "FD");
-        doc.setFontSize(20); doc.setTextColor(217, 119, 6);
-        doc.text(currentStats.dons.toString(), 124, startY + 14, { align: "center" });
-        doc.setFontSize(9); doc.setTextColor(71, 85, 105);
-        doc.text("DONS (Boites)", 124, startY + 21, { align: "center" });
-
-        doc.setDrawColor(233, 213, 255); doc.setFillColor(250, 245, 255);
-        doc.roundedRect(149, startY, 46, 25, 3, 3, "FD");
-        doc.setFontSize(20); doc.setTextColor(147, 51, 234);
-        doc.text(currentStats.ajouts.toString(), 172, startY + 14, { align: "center" });
-        doc.setFontSize(9); doc.setTextColor(71, 85, 105);
-        doc.text("STOCK RECU", 172, startY + 21, { align: "center" });
-
-        // Titre Journal
-        doc.setFontSize(14);
-        doc.setTextColor(15, 23, 42);
-        doc.text("Journal des operations", 15, 95);
-        doc.setLineWidth(0.2);
-        doc.line(15, 98, 195, 98);
-
-        let yPos = 105;
-
-        if (currentAllEvents.length === 0) {
-            doc.setFontSize(10);
-            doc.setTextColor(148, 163, 184);
-            doc.text("Aucune activite enregistree sur cette periode.", 105, 115, { align: "center" });
-        } else {
-            currentAllEvents.forEach(ev => {
-                if (yPos > 275) {
-                    doc.addPage();
-                    yPos = 20;
-                }
-
-                const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-                // === DESSIN DES BADGES COLORÉS ===
-                doc.setFontSize(8);
-                doc.setFont("helvetica", "bold");
-
-                let badgeW = 14;
-                let badgeText = "";
-
-                if (ev.type === 'pret') {
-                    doc.setFillColor(239, 246, 255); doc.setTextColor(37, 99, 235); badgeText = "PRET"; badgeW = 14;
-                } else if (ev.type === 'retour') {
-                    doc.setFillColor(236, 253, 245); doc.setTextColor(16, 185, 129); badgeText = "RETOUR"; badgeW = 20;
-                } else if (ev.type === 'don') {
-                    doc.setFillColor(255, 251, 235); doc.setTextColor(217, 119, 6); badgeText = "DON"; badgeW = 12;
-                } else if (ev.type === 'ajout') {
-                    doc.setFillColor(250, 245, 255); doc.setTextColor(147, 51, 234); badgeText = "STOCK"; badgeW = 16;
-                }
-
-                // On dessine le fond arrondi de la couleur correspondante
-                doc.roundedRect(15, yPos - 3.5, badgeW, 5, 1, 1, "F");
-                // On écrit le texte au centre du badge
-                doc.text(badgeText, 15 + (badgeW / 2), yPos, { align: "center" });
-                // ===================================
-
-                // Date
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(9);
-                doc.setTextColor(100, 100, 100);
-                doc.text(dateStr, 37, yPos);
-
-                // Objet
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(30, 41, 59);
-                doc.text(cleanText(ev.titre), 63, yPos);
-
-                // Détails (Ligne en dessous)
-                yPos += 5;
-                doc.setFont("helvetica", "normal");
-                doc.setTextColor(100, 100, 100);
-
-                // Coupe proprement le texte sans dépasser du PDF
-                const splitDesc = doc.splitTextToSize(cleanText(ev.desc.replace(' | ', ' - ')), 130);
-                doc.text(splitDesc, 63, yPos);
-
-                yPos += (splitDesc.length * 4) + 2;
-
-                // Ligne de séparation douce
-                doc.setDrawColor(241, 245, 249);
-                doc.setLineWidth(0.5);
-                doc.line(15, yPos, 195, yPos);
-                yPos += 6;
-            });
+        function getBadgeHtml(type) {
+            if (type === 'pret') return `<span style="background:#eff6ff; color:#2563eb; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">PRÊT</span>`;
+            if (type === 'retour') return `<span style="background:#ecfdf5; color:#10b981; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">RETOUR</span>`;
+            if (type === 'don') return `<span style="background:#fffbeb; color:#d97706; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">DON</span>`;
+            if (type === 'ajout') return `<span style="background:#faf5ff; color:#9333ea; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">STOCK</span>`;
+            return '';
         }
 
-        // Pied de page
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`Genere le ${new Date().toLocaleString('fr-FR')} par Zeina`, 105, 290, { align: "center" });
+        let trs = "";
+        if (currentAllEvents.length === 0) {
+            trs = `<tr><td colspan="4" style="padding: 15px; text-align: center; color: #94a3b8;">Aucune opération sur cette période.</td></tr>`;
+        } else {
+            trs = currentAllEvents.map(ev => {
+                const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                return `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="width: 15%; padding: 12px 6px; color: #475569; vertical-align: top;">${dateStr}</td>
+                        <td style="width: 12%; padding: 12px 6px; vertical-align: top;">${getBadgeHtml(ev.type)}</td>
+                        <td style="width: 35%; padding: 12px 6px; font-weight: bold; color: #1e293b; vertical-align: top; word-break: break-word; white-space: normal;">${ev.titre}</td>
+                        <td style="width: 38%; padding: 12px 6px; color: #64748b; line-height: 1.5; vertical-align: top; word-break: break-word; white-space: normal;">${ev.desc.replace(' | ', '<br>')}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
 
-        doc.save(`Zeina_Rapport_${startStr}_au_${endStr}.pdf`);
+        const htmlString = `
+        <div id="pdf-export-layer" style="width: 794px; background: white; padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
+            <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px;">
+                <h1 style="color: #1e293b; font-size: 26px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
+                <h2 style="color: #64748b; font-size: 18px; margin: 6px 0 0 0;">Rapport d'activité détaillé</h2>
+                <p style="color: #94a3b8; font-size: 14px; margin: 6px 0 0 0;">Période du <strong>${startStr}</strong> au <strong>${endStr}</strong></p>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; gap: 15px; margin-bottom: 30px; width: 100%;">
+                <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #2563eb;">${currentStats.prets}</h3>
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts</p>
+                </div>
+                <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #10b981;">${currentStats.retours}</h3>
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours</p>
+                </div>
+                <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #d97706;">${currentStats.dons}</h3>
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons</p>
+                </div>
+                <div style="flex: 1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #9333ea;">${currentStats.ajouts}</h3>
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu</p>
+                </div>
+            </div>
+
+            <h3 style="font-size: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; color: #0f172a;">Journal des opérations</h3>
+            
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; table-layout: fixed;">
+                <thead>
+                    <tr style="background: #f8fafc;">
+                        <th style="width: 15%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
+                        <th style="width: 12%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
+                        <th style="width: 35%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
+                        <th style="width: 38%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${trs}
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 30px; text-align: right; color: #94a3b8; font-size: 10px;">
+                Généré le ${new Date().toLocaleString('fr-FR')} par le système Zeïna.
+            </div>
+        </div>
+        `;
+
+        const pdfWrapper = document.createElement('div');
+        pdfWrapper.innerHTML = htmlString;
+        pdfWrapper.style.position = 'absolute';
+        pdfWrapper.style.top = '0';
+        pdfWrapper.style.left = '0';
+        pdfWrapper.style.width = '794px';
+        pdfWrapper.style.zIndex = '-10';
+
+        document.body.appendChild(pdfWrapper);
+
+        const opt = {
+            margin:       10,
+            filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
+            image:        { type: 'jpeg', quality: 1.0 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
+        btn.disabled = true;
+
+        html2pdf().set(opt).from(pdfWrapper).save().then(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            document.body.removeChild(pdfWrapper);
+        }).catch(err => {
+            console.error("Erreur PDF:", err);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            document.body.removeChild(pdfWrapper);
+            alert("Erreur lors de la création du PDF.");
+        });
     });
 }
 

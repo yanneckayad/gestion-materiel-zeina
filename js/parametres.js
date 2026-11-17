@@ -14,14 +14,14 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
 // ==========================================
-// SYSTÈME DE MISE À JOUR FORCÉE (VERSION UNIFIÉE)
-const APP_VERSION = "2.4";
+// SYSTÈME DE MISE À JOUR (SANS DÉCONNEXION)
+const APP_VERSION = "2.6";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
     localStorage.setItem("zeina_version", APP_VERSION);
-    signOut(auth).then(() => { window.location.replace("index.html"); });
+    console.log("Mise à jour vers la version " + APP_VERSION);
 }
 // ==========================================
 
@@ -33,7 +33,6 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// Déconnexion depuis le menu latéral
 document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
 });
@@ -52,7 +51,7 @@ document.getElementById('btn-clear-cache').addEventListener('click', async () =>
     localStorage.removeItem("zeina_version");
 
     setTimeout(() => {
-        alert("Cache nettoyé avec succès. L'application va redémarrer.");
+        alert("Cache nettoyé avec succès. L'application va se recharger.");
         window.location.reload(true);
     }, 1000);
 });
