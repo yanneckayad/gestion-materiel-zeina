@@ -14,31 +14,37 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Zeïna">
-    <link rel="apple-touch-icon" href="icon.png?v=2">
+    <link rel="apple-touch-icon" href="icon.png?v=2.1">
 
     <style>
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        .animate-pop-in { animation: popIn 0.3s ease-out forwards; }
+        /* NOUVELLES ANIMATIONS FLUIDES */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+
+        @keyframes popIn { from { opacity: 0; transform: scale(0.90); } to { opacity: 1; transform: scale(1); } }
+        .animate-pop-in { animation: popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-200 min-h-screen relative selection:bg-blue-500/30">
+<body class="bg-slate-900 text-slate-200 min-h-screen relative selection:bg-blue-500/30 animate-fade-in">
 
 <nav class="bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-800 p-4 shadow-lg flex justify-between items-center">
     <div class="flex items-center gap-3">
-        <button id="menu-btn" class="w-10 h-10 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl flex items-center justify-center transition-all">
+        <button id="menu-btn" class="w-10 h-10 bg-slate-800 hover:bg-slate-700 active:scale-90 text-slate-200 border border-slate-700 rounded-xl flex items-center justify-center transition-all duration-200">
             <i class="fa-solid fa-bars text-lg"></i>
         </button>
         <div class="font-black text-xl sm:text-2xl flex items-center gap-2 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent tracking-tight">
             <i class="fa-solid fa-hand-holding-medical text-blue-500"></i> Zeïna
         </div>
     </div>
-    <button id="logout-btn" class="bg-slate-800 hover:bg-red-600/20 text-slate-300 hover:text-red-400 border border-slate-700 hover:border-red-500/50 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2">
+    <button id="logout-btn" class="bg-slate-800 hover:bg-red-600/20 active:scale-95 text-slate-300 hover:text-red-400 border border-slate-700 hover:border-red-500/50 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2">
         <i class="fa-solid fa-right-from-bracket"></i> <span class="hidden sm:inline">Déconnexion</span>
     </button>
 </nav>
@@ -48,59 +54,59 @@
     <div>
         <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
             <div class="font-black text-xl text-white flex items-center gap-2">
-                <i class="fa-solid fa-shield-halved text-blue-500"></i> Menu Zeïna
+                <i class="fa-solid fa-shield-halved text-blue-500"></i> Menu
             </div>
-            <button id="close-sidebar" class="text-slate-400 hover:text-white p-2">
+            <button id="close-sidebar" class="text-slate-400 hover:text-white active:scale-90 p-2 transition-transform">
                 <i class="fa-solid fa-xmark text-xl"></i>
             </button>
         </div>
         <div class="space-y-2">
-            <a href="dashboard.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-700/60 hover:text-white font-medium transition-all">
+            <a href="dashboard.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-700/60 hover:text-white hover:translate-x-1 font-medium transition-all">
                 <i class="fa-solid fa-wheelchair w-5 text-blue-400"></i> Gestion Matériel
             </a>
             <a href="medicaments.html" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 text-white font-semibold shadow-lg shadow-blue-500/20 transition-all">
                 <i class="fa-solid fa-pills w-5"></i> Gestion Pharmacie
             </a>
-            <a href="rapport.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-700/60 hover:text-white font-medium transition-all">
+            <a href="rapport.html" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-700/60 hover:text-white hover:translate-x-1 font-medium transition-all">
                 <i class="fa-solid fa-chart-pie w-5 text-purple-400"></i> Rapports d'activité
             </a>
         </div>
     </div>
     <div class="border-t border-slate-700 pt-4 text-xs text-slate-500 text-center">
-        La Lumière de l'Ange Zeïna v2.0
+        La Lumière de l'Ange Zeïna v2.1
     </div>
 </aside>
 
 <main class="p-4 sm:p-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-    <div class="col-span-1 bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl h-fit">
+    <div class="col-span-1 bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl h-fit transform transition-all duration-300 hover:border-slate-600 hover:shadow-2xl hover:-translate-y-1">
         <h2 class="text-xl font-bold mb-6 flex items-center gap-2 text-white">
             <i class="fa-solid fa-capsules text-blue-400"></i> Nouveau médicament
         </h2>
         <form id="add-med-form" class="space-y-4">
             <div>
-                <label for="med-name" class="block text-sm font-medium text-slate-400 mb-1">Nom & Dosage</label>
-                <input type="text" id="med-name" placeholder="Ex: Doliprane 1000mg" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50" required>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Nom & Dosage</label>
+                <input type="text" id="med-name" placeholder="Ex: Doliprane 1000mg" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 transition-shadow" required>
             </div>
             <div>
-                <label for="med-stock" class="block text-sm font-medium text-slate-400 mb-1">Quantité (Boîtes)</label>
-                <input type="number" id="med-stock" min="1" value="1" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50" required>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Quantité (Boîtes)</label>
+                <input type="number" id="med-stock" min="1" value="1" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 transition-shadow" required>
             </div>
             <div>
-                <label for="med-exp" class="block text-sm font-medium text-slate-400 mb-1">Date de péremption du lot</label>
-                <input type="date" id="med-exp" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50" required>
+                <label class="block text-sm font-medium text-slate-400 mb-1">Date de péremption du lot</label>
+                <input type="date" id="med-exp" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 transition-shadow" required>
             </div>
             <div>
-                <label for="med-photo" class="block text-sm font-medium text-slate-300 mb-2">Photo de la boîte</label>
-                <input type="file" id="med-photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-500">
+                <label class="block text-sm font-medium text-slate-300 mb-2">Photo de la boîte</label>
+                <input type="file" id="med-photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-500 file:transition-colors file:active:scale-95">
             </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-blue-500/25 transition-all duration-200 flex items-center justify-center gap-2">
                 <i class="fa-solid fa-plus"></i> Ajouter au stock
             </button>
         </form>
     </div>
 
-    <div class="col-span-1 lg:col-span-2 bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl">
+    <div class="col-span-1 lg:col-span-2 bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 shadow-xl transition-all duration-300 hover:border-slate-600">
         <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-4">
             <h2 class="text-xl font-bold flex items-center gap-2 text-white whitespace-nowrap">
                 <i class="fa-solid fa-prescription-bottle-medical text-emerald-400"></i> Pharmacie
@@ -109,22 +115,22 @@
                 <div class="flex w-full sm:w-auto gap-2">
                     <div class="relative flex-grow sm:w-48">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
-                        <input type="text" id="search-med" placeholder="Rechercher..." class="w-full pl-9 pr-3 py-2 bg-slate-900/80 text-white border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/50">
+                        <input type="text" id="search-med" placeholder="Rechercher..." class="w-full pl-9 pr-3 py-2 bg-slate-900/80 text-white border border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/50 transition-shadow">
                     </div>
-                    <button id="btn-scan-barcode" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-md flex items-center gap-2" title="Scanner">
+                    <button id="btn-scan-barcode" class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-md flex items-center gap-2" title="Scanner">
                         <i class="fa-solid fa-barcode"></i> <span class="hidden sm:inline">Scanner</span>
                     </button>
                 </div>
                 <div class="flex space-x-1 bg-slate-900/80 p-1.5 rounded-xl border border-slate-700 w-full sm:w-auto overflow-x-auto">
-                    <button id="filter-all" class="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 text-white shadow-md transition-all">Tous</button>
-                    <button id="filter-stock" class="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">En stock</button>
-                    <button id="filter-expiring" class="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-amber-400 transition-all flex items-center gap-1 whitespace-nowrap"><i class="fa-solid fa-clock"></i> Urgent</button>
-                    <button id="filter-rupture" class="flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">Rupture</button>
+                    <button id="filter-all" class="flex-1 sm:flex-none active:scale-95 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 text-white shadow-md transition-all duration-200">Tous</button>
+                    <button id="filter-stock" class="flex-1 sm:flex-none active:scale-95 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all duration-200">En stock</button>
+                    <button id="filter-expiring" class="flex-1 sm:flex-none active:scale-95 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-amber-400 transition-all duration-200 flex items-center gap-1 whitespace-nowrap"><i class="fa-solid fa-clock"></i> Urgent</button>
+                    <button id="filter-rupture" class="flex-1 sm:flex-none active:scale-95 px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all duration-200">Rupture</button>
                 </div>
             </div>
         </div>
         <div id="med-list" class="space-y-4">
-            <div class="animate-pulse flex items-center justify-center py-10 text-slate-500 gap-3">
+            <div class="flex items-center justify-center py-10 text-slate-500 gap-3">
                 <i class="fa-solid fa-spinner fa-spin text-xl"></i> Chargement...
             </div>
         </div>
@@ -132,11 +138,11 @@
 </main>
 
 <!-- Modale Scanner Code-barres -->
-<div id="barcode-modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+<div id="barcode-modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300">
     <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-md animate-pop-in">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-barcode text-blue-400"></i> Scanner la boîte</h2>
-            <button id="close-barcode-modal" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <button id="close-barcode-modal" class="text-slate-400 hover:text-white active:scale-90 transition-transform"><i class="fa-solid fa-xmark text-xl"></i></button>
         </div>
         <div id="barcode-reader" class="w-full rounded-lg overflow-hidden border border-slate-600 bg-black min-h-[250px]"></div>
         <p class="text-sm text-slate-400 mt-4 text-center">Placez le code-barres de la boîte de médicament dans le cadre.</p>
@@ -144,11 +150,11 @@
 </div>
 
 <!-- Modale Nouveau Médicament Scanné -->
-<div id="new-med-modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+<div id="new-med-modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300">
     <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-md animate-pop-in">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Nouveau médicament</h2>
-            <button id="close-new-med-modal" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <button id="close-new-med-modal" class="text-slate-400 hover:text-white active:scale-90 transition-transform"><i class="fa-solid fa-xmark text-xl"></i></button>
         </div>
         <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-4 text-center">
             <p class="text-amber-400 text-sm font-semibold">Ce médicament n'existe pas encore dans le stock.</p>
@@ -156,37 +162,33 @@
         </div>
         <form id="new-scanned-med-form" class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-slate-400 mb-1">Nom & Dosage</label>
-                <input type="text" id="scanned-med-name" placeholder="Ex: Efferalgan 500mg" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+                <input type="text" id="scanned-med-name" placeholder="Ex: Efferalgan 500mg" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 transition-shadow" required>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Boîtes</label>
-                    <input type="number" id="scanned-med-stock" min="1" value="1" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+                    <input type="number" id="scanned-med-stock" min="1" value="1" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 transition-shadow" required>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Date péremption</label>
-                    <input type="date" id="scanned-med-exp" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+                    <input type="date" id="scanned-med-exp" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 transition-shadow" required>
                 </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Photo de la boîte</label>
-                <input type="file" id="scanned-med-photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white">
+                <input type="file" id="scanned-med-photo" accept="image/*" capture="environment" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white file:active:scale-95 file:transition-transform">
             </div>
             <div class="flex space-x-3 pt-2">
-                <button type="button" id="cancel-new-med" class="flex-1 bg-slate-700 text-white py-3 rounded-xl">Annuler</button>
-                <button type="submit" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg">Enregistrer</button>
+                <button type="button" id="cancel-new-med" class="flex-1 bg-slate-700 active:scale-95 text-white py-3 rounded-xl transition-all">Annuler</button>
+                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-3 rounded-xl shadow-lg transition-all">Enregistrer</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- Modale d'ajout d'un lot (+ Stock) -->
-<div id="restock-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+<div id="restock-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300">
     <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-md animate-pop-in">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-boxes-stacked text-blue-400"></i> Ajouter du stock</h2>
-            <button id="close-restock-modal" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <button id="close-restock-modal" class="text-slate-400 hover:text-white active:scale-90 transition-transform"><i class="fa-solid fa-xmark text-xl"></i></button>
         </div>
         <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-6 text-center">
             <p id="restock-med-name" class="text-blue-400 font-semibold text-lg"></p>
@@ -195,55 +197,50 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Boîtes reçues</label>
-                    <input type="number" id="restock-quantity" min="1" value="1" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+                    <input type="number" id="restock-quantity" min="1" value="1" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 transition-shadow" required>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-400 mb-1">Date péremption</label>
-                    <input type="date" id="restock-exp" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+                    <input type="date" id="restock-exp" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 transition-shadow" required>
                 </div>
             </div>
             <div class="flex space-x-3 pt-4">
-                <button type="button" id="cancel-restock-btn" class="flex-1 bg-slate-700 text-white py-3 rounded-xl">Annuler</button>
-                <button type="submit" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg">Enregistrer le lot</button>
+                <button type="button" id="cancel-restock-btn" class="flex-1 bg-slate-700 active:scale-95 text-white py-3 rounded-xl transition-all">Annuler</button>
+                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-3 rounded-xl shadow-lg transition-all">Enregistrer le lot</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Modale de Distribution avec choix du Lot -->
-<div id="give-med-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+<!-- Modale de Distribution -->
+<div id="give-med-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300">
     <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-md animate-pop-in">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-hand-holding-medical text-emerald-400"></i> Distribuer</h2>
-            <button id="close-give-modal" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <button id="close-give-modal" class="text-slate-400 hover:text-white active:scale-90 transition-transform"><i class="fa-solid fa-xmark text-xl"></i></button>
         </div>
         <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 mb-6 text-center">
             <p id="give-med-name" class="text-emerald-400 font-semibold text-lg"></p>
             <p id="give-med-stock-info" class="text-xs text-slate-400 mt-1"></p>
         </div>
         <form id="give-med-form" class="space-y-4">
-
             <div>
                 <label class="block text-sm font-medium text-slate-400 mb-1">Lot à distribuer (FEFO)</label>
-                <select id="give-lot-select" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500/50" required>
-                    <!-- Rempli automatiquement en JS -->
-                </select>
+                <select id="give-lot-select" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500/50 transition-shadow" required></select>
             </div>
-
             <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-1">
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Quantité (Boîtes)</label>
-                    <input type="number" id="give-quantity" min="1" value="1" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Quantité</label>
+                    <input type="number" id="give-quantity" min="1" value="1" class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500/50 transition-shadow" required>
                 </div>
                 <div class="col-span-1">
                     <label class="block text-sm font-medium text-slate-400 mb-1">Bénéficiaire</label>
-                    <input type="text" id="give-beneficiary" placeholder="Famille..." class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl" required>
+                    <input type="text" id="give-beneficiary" placeholder="Famille..." class="w-full px-3 py-2.5 bg-slate-900/50 text-white border border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500/50 transition-shadow" required>
                 </div>
             </div>
-
             <div class="flex space-x-3 pt-4">
-                <button type="button" id="cancel-give-btn" class="flex-1 bg-slate-700 text-white py-3 rounded-xl">Annuler</button>
-                <button type="submit" class="flex-1 bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg">Confirmer le don</button>
+                <button type="button" id="cancel-give-btn" class="flex-1 bg-slate-700 active:scale-95 text-white py-3 rounded-xl transition-all">Annuler</button>
+                <button type="submit" class="flex-1 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold py-3 rounded-xl shadow-lg transition-all">Confirmer le don</button>
             </div>
         </form>
     </div>

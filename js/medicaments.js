@@ -17,19 +17,13 @@ const db = getFirestore(app);
 
 // ==========================================
 // SYSTÈME DE MISE À JOUR FORCÉE
-const APP_VERSION = "2.1"; // ⚠️ Change ce numéro à chaque fois que tu mets à jour le site (ex: "2.1", "2.2")
-
+const APP_VERSION = "2.1";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
-    // 1. On vide la mémoire cache du téléphone pour forcer le nouveau code
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
-    // 2. On mémorise la nouvelle version
     localStorage.setItem("zeina_version", APP_VERSION);
-    // 3. On force la déconnexion et on renvoie à l'accueil
-    signOut(auth).then(() => {
-        window.location.replace("index.html");
-    });
+    signOut(auth).then(() => { window.location.replace("index.html"); });
 }
 // ==========================================
 
@@ -41,7 +35,7 @@ let allMeds = [];
 let searchQuery = "";
 let currentFilter = "all";
 let currentMedId = null;
-let currentMedLots = []; // Stocke les lots du médicament sélectionné
+let currentMedLots = [];
 let scannedBarcodeValue = "";
 
 document.getElementById('logout-btn').addEventListener('click', () => {
@@ -81,17 +75,12 @@ async function uploadToCloudinary(file) {
     return data.secure_url;
 }
 
-// Fonction de rétrocompatibilité pour extraire les lots propres
 function extractLots(data) {
     let lots = data.lots || [];
     let qteTotale = data.quantiteTotale ?? data.quantite ?? 0;
-
-    // Si c'est un vieil enregistrement, on le convertit virtuellement en lot unique
     if (lots.length === 0 && data.dateExpiration && qteTotale > 0) {
         lots = [{ quantite: qteTotale, dateExpiration: data.dateExpiration }];
     }
-
-    // Tri par date d'expiration (FEFO) : le plus urgent en premier
     lots.sort((a, b) => new Date(a.dateExpiration) - new Date(b.dateExpiration));
     return { lots, qteTotale };
 }
@@ -117,7 +106,7 @@ addMedForm.addEventListener('submit', async (e) => {
         const medRef = await addDoc(collection(db, "medicaments"), {
             nom: name,
             quantiteTotale: stock,
-            quantite: stock, // Gardé pour sécurité
+            quantite: stock,
             lots: [{ quantite: stock, dateExpiration: expDate }],
             photo: imageUrl,
             codeBarre: "",
@@ -133,7 +122,7 @@ addMedForm.addEventListener('submit', async (e) => {
         });
 
         addMedForm.reset();
-        alert("Médicament et lot ajoutés avec succès !");
+        alert("Médicament ajouté avec succès !");
     } catch (error) {
         alert("Erreur : " + error.message);
     } finally {
@@ -256,7 +245,7 @@ function renderMeds() {
 
         let isExpiringSoon = false;
         if (lots.length > 0) {
-            const expDate = new Date(lots[0].dateExpiration); // Le lot le plus urgent
+            const expDate = new Date(lots[0].dateExpiration);
             const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
             if (diffDays >= 0 && diffDays <= 90) isExpiringSoon = true;
         }
@@ -269,18 +258,18 @@ function renderMeds() {
     });
 
     if (filtered.length === 0) {
-        medListEl.innerHTML = '<div class="text-center py-10 text-slate-500"><i class="fa-solid fa-pills text-4xl mb-3 opacity-50"></i><p>Aucun médicament trouvé.</p></div>';
+        medListEl.innerHTML = '<div class="text-center py-10 text-slate-500 animate-fade-in"><i class="fa-solid fa-pills text-4xl mb-3 opacity-50"></i><p>Aucun médicament trouvé.</p></div>';
         return;
     }
 
-    filtered.forEach((item) => {
+    filtered.forEach((item, index) => {
         const data = item.data;
         const id = item.id;
         const { lots, qteTotale } = extractLots(data);
 
         let badgeHtml = '';
         if (qteTotale === 0) {
-            badgeHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20"><i class="fa-solid fa-circle-xmark mr-1"></i> Rupture de stock</span>`;
+            badgeHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20"><i class="fa-solid fa-circle-xmark mr-1"></i> Rupture</span>`;
         } else if (lots.length > 0) {
             const expDate = new Date(lots[0].dateExpiration);
             const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
@@ -293,19 +282,21 @@ function renderMeds() {
             }
         }
 
-        // Affichage visuel des lots
         const lotsHtml = lots.map(l => `<span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700 font-mono text-[10px]">${l.quantite}x Exp: ${l.dateExpiration}</span>`).join(' ');
 
         const card = document.createElement('div');
-        card.className = "bg-slate-900/40 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-slate-700/50 hover:border-slate-500 transition-all";
+        // NOUVEAU : Effet Cascade (animate-slide-up), Délai (animationDelay), et Survol (hover:-translate-y-1, hover:shadow-xl)
+        card.className = "animate-slide-up bg-slate-900/40 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-slate-700/50 hover:border-slate-500 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-900/10 transition-all duration-300";
+        card.style.animationDelay = `${index * 60}ms`; // Décale l'apparition de chaque carte de 60ms
+
         card.innerHTML = `
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-4 w-full sm:w-auto">
                 <div class="w-16 h-16 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 shadow-md">
-                    <img src="${data.photo}" alt="Boîte" class="w-full h-full object-cover">
+                    <img src="${data.photo}" alt="Boîte" class="w-full h-full object-cover transition-transform duration-500 hover:scale-110">
                 </div>
-                <div>
+                <div class="flex-grow">
                     <a href="med-history.html?id=${id}" class="font-bold text-white text-lg hover:text-blue-400 transition-colors flex items-center gap-2 group">
-                        ${data.nom} <i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                        ${data.nom} <i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1 group-hover:-translate-y-1"></i>
                     </a>
                     <div class="flex items-center gap-2 mt-1 flex-wrap">
                         <span class="text-sm font-mono text-white bg-blue-600/20 px-2 py-0.5 rounded border border-blue-500/30">Total : <strong>${qteTotale}</strong></span>
@@ -316,25 +307,25 @@ function renderMeds() {
                     </div>
                 </div>
             </div>
-            <div class="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                <button class="btn-give bg-emerald-600/25 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5" data-id="${id}" data-nom="${data.nom}">
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap mt-2 sm:mt-0">
+                <button class="btn-give active:scale-95 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-1.5" data-id="${id}" data-nom="${data.nom}">
                     <i class="fa-solid fa-hand-holding-medical pointer-events-none"></i> Donner
                 </button>
-                <button class="btn-restock bg-blue-600/25 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5" data-id="${id}" data-nom="${data.nom}">
+                <button class="btn-restock active:scale-95 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-1.5" data-id="${id}" data-nom="${data.nom}">
                     <i class="fa-solid fa-boxes-stacked pointer-events-none"></i> + Stock
                 </button>
-                <button onclick="deleteMed('${id}')" class="w-9 h-9 bg-slate-800 hover:bg-red-600/20 text-slate-400 hover:text-red-400 border border-slate-700 rounded-lg transition-all ml-1" title="Supprimer"><i class="fa-solid fa-trash"></i></button>
+                <button onclick="deleteMed('${id}')" class="w-9 h-9 active:scale-90 bg-slate-800 hover:bg-red-600/20 text-slate-400 hover:text-red-400 border border-slate-700 rounded-lg transition-all duration-200 ml-1" title="Supprimer"><i class="fa-solid fa-trash"></i></button>
             </div>
         `;
         medListEl.appendChild(card);
     });
 
+    // Réattachement des événements (le reste du code reste identique)
     document.querySelectorAll('.btn-give').forEach(button => {
         button.addEventListener('click', async (e) => {
             currentMedId = e.target.getAttribute('data-id');
             const nom = e.target.getAttribute('data-nom');
 
-            // On récupère la donnée la plus fraîche
             const medDoc = await getDoc(doc(db, "medicaments", currentMedId));
             const { lots, qteTotale } = extractLots(medDoc.data());
             currentMedLots = lots;
@@ -348,7 +339,6 @@ function renderMeds() {
             document.getElementById('give-quantity').value = 1;
             document.getElementById('give-beneficiary').value = "";
 
-            // Remplir le menu déroulant des lots (FEFO)
             const lotSelect = document.getElementById('give-lot-select');
             lotSelect.innerHTML = "";
             lots.forEach((lot, index) => {
@@ -375,7 +365,6 @@ function renderMeds() {
     });
 }
 
-// Validation de la modale de Don
 const giveModal = document.getElementById('give-med-modal');
 document.getElementById('close-give-modal').addEventListener('click', () => giveModal.classList.add('hidden'));
 document.getElementById('cancel-give-btn').addEventListener('click', () => giveModal.classList.add('hidden'));
@@ -391,18 +380,11 @@ document.getElementById('give-med-form').addEventListener('submit', async (e) =>
         let { lots, qteTotale } = extractLots(medDoc.data());
 
         let lotIndex = lots.findIndex(l => l.dateExpiration === selectedExpDate);
-
-        if (lotIndex === -1 || lots[lotIndex].quantite < qtyToGive) {
-            return alert("Erreur : Ce lot ne contient pas assez de boîtes !");
-        }
+        if (lotIndex === -1 || lots[lotIndex].quantite < qtyToGive) return alert("Erreur : Ce lot ne contient pas assez de boîtes !");
 
         lots[lotIndex].quantite -= qtyToGive;
         qteTotale -= qtyToGive;
-
-        // Nettoyer les lots vides
-        if (lots[lotIndex].quantite === 0) {
-            lots.splice(lotIndex, 1);
-        }
+        if (lots[lotIndex].quantite === 0) lots.splice(lotIndex, 1);
 
         await updateDoc(doc(db, "medicaments", currentMedId), {
             lots: lots,
@@ -426,7 +408,6 @@ document.getElementById('give-med-form').addEventListener('submit', async (e) =>
     }
 });
 
-// Validation de la modale d'Ajout de Stock (+ Stock)
 const restockModal = document.getElementById('restock-modal');
 document.getElementById('close-restock-modal').addEventListener('click', () => restockModal.classList.add('hidden'));
 document.getElementById('cancel-restock-btn').addEventListener('click', () => restockModal.classList.add('hidden'));
@@ -440,13 +421,9 @@ document.getElementById('restock-form').addEventListener('submit', async (e) => 
         const medDoc = await getDoc(doc(db, "medicaments", currentMedId));
         let { lots, qteTotale } = extractLots(medDoc.data());
 
-        // Vérifier si un lot avec la même date existe déjà
         let existingLot = lots.find(l => l.dateExpiration === expDate);
-        if (existingLot) {
-            existingLot.quantite += qty;
-        } else {
-            lots.push({ quantite: qty, dateExpiration: expDate });
-        }
+        if (existingLot) existingLot.quantite += qty;
+        else lots.push({ quantite: qty, dateExpiration: expDate });
 
         qteTotale += qty;
 
