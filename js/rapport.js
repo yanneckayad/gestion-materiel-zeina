@@ -177,131 +177,103 @@ async function generateReport() {
 }
 
 // =========================================================================
-// MOTEUR PDF ROBUSTE (MÉTHODE INFAILLIBLE : CONTENEUR TAILLE 0)
+// MOTEUR PDF INFAILLIBLE : jsPDF + autoTable (Aucun blocage, Génération en 0.1s)
 // =========================================================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
     btnDownloadPdf.addEventListener('click', () => {
         const btn = document.getElementById('btn-download-pdf');
         const originalText = btn.innerHTML;
-
-        const startStr = document.getElementById('date-debut').value;
-        const endStr = document.getElementById('date-fin').value;
-
-        function getBadgeHtml(type) {
-            if (type === 'pret') return `<div style="background:#eff6ff; color:#2563eb; padding: 4px; border-radius: 4px; font-weight: bold; font-size: 10px; text-align: center;">PRÊT</div>`;
-            if (type === 'retour') return `<div style="background:#ecfdf5; color:#10b981; padding: 4px; border-radius: 4px; font-weight: bold; font-size: 10px; text-align: center;">RETOUR</div>`;
-            if (type === 'don') return `<div style="background:#fffbeb; color:#d97706; padding: 4px; border-radius: 4px; font-weight: bold; font-size: 10px; text-align: center;">DON</div>`;
-            if (type === 'ajout') return `<div style="background:#faf5ff; color:#9333ea; padding: 4px; border-radius: 4px; font-weight: bold; font-size: 10px; text-align: center;">STOCK</div>`;
-            return '';
-        }
-
-        let trs = "";
-        if (currentAllEvents.length === 0) {
-            trs = `<tr><td colspan="4" style="padding: 15px; text-align: center; color: #94a3b8;">Aucune opération sur cette période.</td></tr>`;
-        } else {
-            trs = currentAllEvents.map(ev => {
-                const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-                return `
-                    <tr style="border-bottom: 1px solid #e2e8f0;">
-                        <td style="width: 15%; padding: 10px 5px; color: #475569; vertical-align: top;">${dateStr}</td>
-                        <td style="width: 12%; padding: 10px 5px; vertical-align: top;">${getBadgeHtml(ev.type)}</td>
-                        <td style="width: 35%; padding: 10px 5px; font-weight: bold; color: #1e293b; vertical-align: top; word-break: break-word;">${ev.titre}</td>
-                        <td style="width: 38%; padding: 10px 5px; color: #64748b; line-height: 1.4; vertical-align: top; word-break: break-word;">${ev.desc.replace(' | ', '<br>')}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        const htmlString = `
-            <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px;">
-                <h1 style="color: #1e293b; font-size: 24px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
-                <h2 style="color: #64748b; font-size: 16px; margin: 5px 0 0 0;">Rapport d'activité détaillé</h2>
-                <p style="color: #94a3b8; font-size: 13px; margin: 5px 0 0 0;">Période du <strong>${startStr}</strong> au <strong>${endStr}</strong></p>
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 25px; width: 100%;">
-                <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 20px; color: #2563eb;">${currentStats.prets}</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 10px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts</p>
-                </div>
-                <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 12px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 20px; color: #10b981;">${currentStats.retours}</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 10px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours</p>
-                </div>
-                <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 20px; color: #d97706;">${currentStats.dons}</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 10px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons</p>
-                </div>
-                <div style="flex: 1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 12px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 20px; color: #9333ea;">${currentStats.ajouts}</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 10px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu</p>
-                </div>
-            </div>
-
-            <h3 style="font-size: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; color: #0f172a;">Journal des opérations</h3>
-            
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed;">
-                <thead>
-                    <tr style="background: #f8fafc;">
-                        <th style="width: 15%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
-                        <th style="width: 12%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
-                        <th style="width: 35%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
-                        <th style="width: 38%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${trs}
-                </tbody>
-            </table>
-            
-            <div style="margin-top: 20px; text-align: right; color: #94a3b8; font-size: 9px;">
-                Généré le ${new Date().toLocaleString('fr-FR')} par le système Zeïna.
-            </div>
-        `;
-
-        // 1. La "boîte invisible" (taille 0, donc elle ne décale rien à l'écran)
-        const hiddenContainer = document.createElement('div');
-        hiddenContainer.style.position = 'absolute';
-        hiddenContainer.style.width = '0px';
-        hiddenContainer.style.height = '0px';
-        hiddenContainer.style.overflow = 'hidden';
-
-        // 2. Le document PDF avec largeur fixe (A4) inséré DANS la boîte invisible
-        const pdfNode = document.createElement('div');
-        pdfNode.style.width = '794px';
-        pdfNode.style.backgroundColor = '#ffffff';
-        pdfNode.style.padding = '30px';
-        pdfNode.style.fontFamily = 'Helvetica Neue, Helvetica, Arial, sans-serif';
-        pdfNode.innerHTML = htmlString;
-
-        hiddenContainer.appendChild(pdfNode);
-        document.body.appendChild(hiddenContainer);
-
-        const opt = {
-            margin:       10,
-            filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
-            image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Création...';
         btn.disabled = true;
 
-        // 3. On demande à html2pdf de capturer le document caché
-        html2pdf().set(opt).from(pdfNode).save().then(() => {
+        try {
+            if (!window.jspdf) {
+                alert("Erreur : La librairie PDF n'est pas chargée. Veuillez mettre à jour rapport.html.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                return;
+            }
+
+            const startStr = document.getElementById('date-debut').value;
+            const endStr = document.getElementById('date-fin').value;
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // En-tête du PDF
+            doc.setFontSize(22);
+            doc.setTextColor(37, 99, 235); // Bleu Zeïna
+            doc.text("La Lumiere de l'Ange Zeina", 14, 20);
+
+            doc.setFontSize(14);
+            doc.setTextColor(71, 85, 105);
+            doc.text("Rapport d'activite detaille", 14, 28);
+
+            doc.setFontSize(10);
+            doc.setTextColor(148, 163, 184);
+            doc.text(`Periode du ${startStr} au ${endStr}`, 14, 34);
+
+            // Ligne de séparation
+            doc.setDrawColor(226, 232, 240);
+            doc.line(14, 38, 196, 38);
+
+            // Chiffres Clés (Statistiques)
+            doc.setFontSize(11);
+            doc.setTextColor(15, 23, 42);
+            doc.text(`Prets : ${currentStats.prets}  |  Retours : ${currentStats.retours}  |  Dons : ${currentStats.dons}  |  Ajouts Stock : ${currentStats.ajouts}`, 14, 46);
+
+            // Préparation des données du journal
+            const tableData = currentAllEvents.map(ev => {
+                const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                // Nettoyage des caractères spéciaux pour une police standard
+                let action = ev.type.toUpperCase();
+                let titre = ev.titre.replace(/Prêt/g, 'Pret').replace(/Médicament/g, 'Medicament').replace(/Boîte/g, 'Boite').replace(/boîte/g, 'boite');
+                let desc = ev.desc.replace(' | ', '\n').replace(/Bénéficiaire/g, 'Beneficiaire').replace(/Réceptionné/g, 'Receptionne');
+
+                return [dateStr, action, titre, desc];
+            });
+
+            if (tableData.length === 0) {
+                tableData.push(["-", "-", "Aucune operation sur cette periode", "-"]);
+            }
+
+            // Génération du tableau (autoTable gère tout le formatage proprement)
+            if (doc.autoTable) {
+                doc.autoTable({
+                    startY: 52,
+                    head: [['Date', 'Action', 'Objet', 'Details']],
+                    body: tableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
+                    styles: { fontSize: 9, cellPadding: 4, valign: 'middle' },
+                    columnStyles: {
+                        0: { cellWidth: 28 },
+                        1: { cellWidth: 22 },
+                        2: { cellWidth: 65 },
+                        3: { cellWidth: 'auto' }
+                    },
+                    didDrawPage: function (data) {
+                        doc.setFontSize(8);
+                        doc.setTextColor(148, 163, 184);
+                        doc.text('Genere le ' + new Date().toLocaleString('fr-FR') + ' par l\'application Zeina', data.settings.margin.left, doc.internal.pageSize.height - 10);
+                    }
+                });
+            } else {
+                doc.text("Module tableau manquant.", 14, 60);
+            }
+
+            // Téléchargement du PDF
+            doc.save(`Zeina_Rapport_${startStr}_au_${endStr}.pdf`);
+
+        } catch (error) {
+            console.error("Erreur PDF :", error);
+            alert("Erreur : " + error.message);
+        } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
-            // 4. On supprime la boîte invisible
-            document.body.removeChild(hiddenContainer);
-        }).catch(err => {
-            console.error(err);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            document.body.removeChild(hiddenContainer);
-            alert("Erreur lors de la création du PDF.");
-        });
+        }
     });
 }
 
