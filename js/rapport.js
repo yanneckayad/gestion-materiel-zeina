@@ -15,7 +15,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ==========================================
 const APP_VERSION = "2.4";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
@@ -24,7 +23,6 @@ if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     localStorage.setItem("zeina_version", APP_VERSION);
     signOut(auth).then(() => { window.location.replace("index.html"); });
 }
-// ==========================================
 
 onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
@@ -46,6 +44,10 @@ document.getElementById('report-form').addEventListener('submit', async (e) => {
     await generateReport();
 });
 
+// Variables globales pour stocker les données prêtes pour le PDF
+let currentAllEvents = [];
+let currentStats = { prets: 0, retours: 0, dons: 0, ajouts: 0 };
+
 async function generateReport() {
     const startInput = document.getElementById('date-debut').value;
     const endInput = document.getElementById('date-fin').value;
@@ -57,7 +59,6 @@ async function generateReport() {
     endDate.setHours(23, 59, 59, 999);
 
     const submitBtn = document.querySelector('#report-form button');
-    const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calcul...';
     submitBtn.disabled = true;
 
@@ -70,25 +71,20 @@ async function generateReport() {
         const medSnap = await getDocs(collection(db, "medicaments"));
         medSnap.forEach(doc => medMap[doc.id] = doc.data().nom);
 
-        let allEvents = [];
-        let countPrets = 0, countRetours = 0, countDons = 0, countAjouts = 0;
+        currentAllEvents = [];
+        currentStats = { prets: 0, retours: 0, dons: 0, ajouts: 0 };
 
         const pretsSnap = await getDocs(collection(db, "prets"));
         pretsSnap.forEach(doc => {
             const data = doc.data();
             const eventDate = data.datePret.toDate();
             if (eventDate >= startDate && eventDate <= endDate) {
-                countPrets++;
-                allEvents.push({
-                    date: eventDate,
-                    category: 'materiel',
-                    itemId: data.materielId,
-                    type: 'pret',
+                currentStats.prets++;
+                currentAllEvents.push({
+                    date: eventDate, category: 'materiel', itemId: data.materielId, type: 'pret',
                     titre: `Prêt : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
                     desc: `Au patient : ${data.patientNom} | Par : ${data.membreEmail}`,
-                    icon: 'fa-hand-holding-heart',
-                    color: 'text-blue-400',
-                    bg: 'bg-blue-900'
+                    icon: 'fa-hand-holding-heart', color: 'text-blue-400', bg: 'bg-blue-900'
                 });
             }
         });
@@ -98,17 +94,12 @@ async function generateReport() {
             const data = doc.data();
             const eventDate = data.dateRetour.toDate();
             if (eventDate >= startDate && eventDate <= endDate) {
-                countRetours++;
-                allEvents.push({
-                    date: eventDate,
-                    category: 'materiel',
-                    itemId: data.materielId,
-                    type: 'retour',
+                currentStats.retours++;
+                currentAllEvents.push({
+                    date: eventDate, category: 'materiel', itemId: data.materielId, type: 'retour',
                     titre: `Retour : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
                     desc: `Validé par : ${data.membreEmail}`,
-                    icon: 'fa-boxes-packing',
-                    color: 'text-emerald-400',
-                    bg: 'bg-emerald-900'
+                    icon: 'fa-boxes-packing', color: 'text-emerald-400', bg: 'bg-emerald-900'
                 });
             }
         });
@@ -119,51 +110,40 @@ async function generateReport() {
             const eventDate = data.date.toDate();
             if (eventDate >= startDate && eventDate <= endDate) {
                 const medName = medMap[data.medicamentId] || 'Médicament supprimé';
-
                 if (data.type === "distribution") {
-                    countDons += data.quantite;
-                    allEvents.push({
-                        date: eventDate,
-                        category: 'medicament',
-                        itemId: data.medicamentId,
-                        type: 'don',
+                    currentStats.dons += data.quantite;
+                    currentAllEvents.push({
+                        date: eventDate, category: 'medicament', itemId: data.medicamentId, type: 'don',
                         titre: `Don : ${medName} (-${data.quantite} boîte(s))`,
                         desc: `Au patient : ${data.beneficiaire} | Par : ${data.membreEmail}`,
-                        icon: 'fa-pills',
-                        color: 'text-amber-400',
-                        bg: 'bg-amber-900'
+                        icon: 'fa-pills', color: 'text-amber-400', bg: 'bg-amber-900'
                     });
                 } else if (data.type === "ajout_stock") {
-                    countAjouts += data.quantite;
-                    allEvents.push({
-                        date: eventDate,
-                        category: 'medicament',
-                        itemId: data.medicamentId,
-                        type: 'ajout',
+                    currentStats.ajouts += data.quantite;
+                    currentAllEvents.push({
+                        date: eventDate, category: 'medicament', itemId: data.medicamentId, type: 'ajout',
                         titre: `Ajout Stock : ${medName} (+${data.quantite} boîte(s))`,
                         desc: `Réceptionné par : ${data.membreEmail}`,
-                        icon: 'fa-boxes-stacked',
-                        color: 'text-purple-400',
-                        bg: 'bg-purple-900'
+                        icon: 'fa-boxes-stacked', color: 'text-purple-400', bg: 'bg-purple-900'
                     });
                 }
             }
         });
 
-        document.getElementById('stat-prets').textContent = countPrets;
-        document.getElementById('stat-retours').textContent = countRetours;
-        document.getElementById('stat-dons').textContent = countDons;
-        document.getElementById('stat-ajouts').textContent = countAjouts;
+        document.getElementById('stat-prets').textContent = currentStats.prets;
+        document.getElementById('stat-retours').textContent = currentStats.retours;
+        document.getElementById('stat-dons').textContent = currentStats.dons;
+        document.getElementById('stat-ajouts').textContent = currentStats.ajouts;
 
-        allEvents.sort((a, b) => b.date - a.date);
+        currentAllEvents.sort((a, b) => b.date - a.date);
 
         const timelineEl = document.getElementById('report-timeline');
         timelineEl.innerHTML = "";
 
-        if (allEvents.length === 0) {
+        if (currentAllEvents.length === 0) {
             timelineEl.innerHTML = `<p class="pl-6 text-slate-500 italic">Aucune activité enregistrée sur cette période.</p>`;
         } else {
-            allEvents.forEach(ev => {
+            currentAllEvents.forEach(ev => {
                 const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
                 const targetUrl = ev.category === 'materiel' ? `history.html?id=${ev.itemId}` : `med-history.html?id=${ev.itemId}`;
 
@@ -196,37 +176,123 @@ async function generateReport() {
     }
 }
 
-// TÉLÉCHARGEMENT PDF
+// =========================================================================
+// NOVEAU MOTEUR DE GÉNÉRATION PDF 100% PRO ET STYLISÉ
+// =========================================================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
     btnDownloadPdf.addEventListener('click', () => {
         const btn = document.getElementById('btn-download-pdf');
         const originalText = btn.innerHTML;
 
-        const element = document.getElementById('report-content');
-        const pdfHeader = document.getElementById('pdf-header');
-        const pdfDates = document.getElementById('pdf-dates-display');
-
         const startStr = document.getElementById('date-debut').value;
         const endStr = document.getElementById('date-fin').value;
-        pdfDates.textContent = `Période du ${startStr} au ${endStr}`;
-        pdfHeader.classList.remove('hidden');
 
+        // Génération des badges colorés (sans FontAwesome pour éviter les bugs)
+        function getBadgeHtml(type) {
+            if (type === 'pret') return `<span style="background:#eff6ff; color:#2563eb; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">PRÊT</span>`;
+            if (type === 'retour') return `<span style="background:#ecfdf5; color:#10b981; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">RETOUR</span>`;
+            if (type === 'don') return `<span style="background:#fffbeb; color:#d97706; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">DON</span>`;
+            if (type === 'ajout') return `<span style="background:#faf5ff; color:#9333ea; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">STOCK</span>`;
+            return '';
+        }
+
+        // Création du journal sous forme de vrai tableau propre
+        let trs = "";
+        if (currentAllEvents.length === 0) {
+            trs = `<tr><td colspan="4" style="padding: 20px; text-align: center; color: #94a3b8;">Aucune opération sur cette période.</td></tr>`;
+        } else {
+            trs = currentAllEvents.map(ev => {
+                const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                return `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 12px 10px; color: #475569;">${dateStr}</td>
+                        <td style="padding: 12px 10px;">${getBadgeHtml(ev.type)}</td>
+                        <td style="padding: 12px 10px; font-weight: bold; color: #1e293b;">${ev.titre}</td>
+                        <td style="padding: 12px 10px; color: #64748b; font-size: 11px; line-height: 1.4;">${ev.desc.replace(' | ', '<br>')}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Création d'un HTML sur mesure, invisible sur l'écran, parfait pour le PDF
+        const htmlContent = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; padding: 20px; background: white;">
+            
+            <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px;">
+                <h1 style="color: #1e293b; font-size: 26px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
+                <h2 style="color: #64748b; font-size: 18px; margin: 5px 0 0 0;">Rapport d'activité détaillé</h2>
+                <p style="color: #94a3b8; font-size: 14px; margin: 5px 0 0 0;">Période du <strong>${startStr}</strong> au <strong>${endStr}</strong></p>
+            </div>
+
+            <!-- Statistiques -->
+            <div style="display: flex; gap: 15px; margin-bottom: 35px;">
+                <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #2563eb;">${currentStats.prets}</h3>
+                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts de matériel</p>
+                </div>
+                <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #10b981;">${currentStats.retours}</h3>
+                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours de matériel</p>
+                </div>
+                <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #d97706;">${currentStats.dons}</h3>
+                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons (Boîtes)</p>
+                </div>
+                <div style="flex: 1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #9333ea;">${currentStats.ajouts}</h3>
+                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu (Boîtes)</p>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <h3 style="font-size: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; color: #0f172a;">Journal des opérations</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                <thead>
+                    <tr style="background: #f8fafc;">
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet concerné</th>
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails (Patient / Bénévole)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${trs}
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 30px; text-align: right; color: #94a3b8; font-size: 10px;">
+                Généré le ${new Date().toLocaleString('fr-FR')} par le système Zeïna.
+            </div>
+        </div>
+        `;
+
+        // Création d'un élément temporaire caché pour html2pdf
+        const element = document.createElement('div');
+        element.style.position = 'absolute';
+        element.style.top = '-9999px';
+        element.style.left = '-9999px';
+        element.style.width = '800px';
+        element.innerHTML = htmlContent;
+        document.body.appendChild(element);
+
+        // Options PDF en Qualité Pro
         const opt = {
             margin:       10,
             filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0f172a' },
+            image:        { type: 'jpeg', quality: 1.0 },
+            html2canvas:  { scale: 2 },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
         btn.disabled = true;
 
+        // Exécution et nettoyage
         html2pdf().set(opt).from(element).save().then(() => {
             btn.innerHTML = originalText;
             btn.disabled = false;
-            pdfHeader.classList.add('hidden');
+            document.body.removeChild(element);
         });
     });
 }
