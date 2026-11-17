@@ -28,11 +28,21 @@ addItemForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('item-name').value;
     const ref = document.getElementById('item-ref').value;
+
+    // Animation du bouton pendant l'envoi
+    const submitBtn = addItemForm.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Ajout...';
+    submitBtn.disabled = true;
+
     try {
         await addDoc(collection(db, "materiel"), { nom: name, reference: ref, statut: "Disponible", dateAjout: new Date() });
         addItemForm.reset();
     } catch (error) {
         alert("Erreur lors de l'ajout : " + error.message);
+    } finally {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
     }
 });
 
@@ -42,11 +52,11 @@ const btnFilterLoaned = document.getElementById('filter-loaned');
 
 function updateFilterUI(activeBtn) {
     [btnFilterAll, btnFilterAvailable, btnFilterLoaned].forEach(btn => {
-        btn.classList.remove('bg-slate-700', 'text-white', 'shadow');
+        btn.classList.remove('bg-slate-700', 'text-white', 'shadow-md');
         btn.classList.add('text-slate-400');
     });
     activeBtn.classList.remove('text-slate-400');
-    activeBtn.classList.add('bg-slate-700', 'text-white', 'shadow');
+    activeBtn.classList.add('bg-slate-700', 'text-white', 'shadow-md');
 }
 
 btnFilterAll.addEventListener('click', () => { currentFilter = "all"; updateFilterUI(btnFilterAll); renderInventory(); });
@@ -60,33 +70,44 @@ function renderInventory() {
     const filteredList = allMateriel.filter(item => currentFilter === "all" || item.data.statut === currentFilter);
 
     if (filteredList.length === 0) {
-        inventoryList.innerHTML = '<p class="text-slate-400 text-sm">Aucun matériel ne correspond à ce filtre.</p>';
+        inventoryList.innerHTML = '<div class="text-center py-10 text-slate-500 animate-fade-in"><i class="fa-solid fa-box-open text-4xl mb-3 opacity-50"></i><p>Aucun matériel trouvé dans cette catégorie.</p></div>';
         return;
     }
 
-    filteredList.forEach((item) => {
+    // On ajoute un petit délai (index) pour faire apparaître les lignes en cascade
+    filteredList.forEach((item, index) => {
         const data = item.data;
         const itemId = item.id;
         const itemElement = document.createElement('div');
-        itemElement.className = "bg-slate-700 p-4 rounded-lg flex justify-between items-center border border-slate-600";
+
+        // Classes de la carte (Hover effects et animation fade-in)
+        itemElement.className = "animate-fade-in bg-slate-900/40 p-4 sm:p-5 rounded-xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 border border-slate-700/50 hover:border-slate-500 hover:bg-slate-800/60 shadow-lg hover:shadow-xl transition-all duration-300";
+        itemElement.style.animationDelay = `${index * 0.05}s`; // Effet cascade
 
         let actionHtml = '';
         let statusBadge = '';
+
         if (data.statut === "Disponible") {
-            statusBadge = `<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-500/20 text-green-400">Disponible</span>`;
-            actionHtml = `<button class="btn-preter bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-2 rounded-lg ml-4 transition" data-id="${itemId}" data-nom="${data.nom}">Prêter</button>`;
+            statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-circle-check"></i> Disponible</span>`;
+            actionHtml = `<button class="btn-preter w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}" data-nom="${data.nom}"><i class="fa-solid fa-hand-holding-heart mr-2 pointer-events-none"></i>Prêter</button>`;
         } else {
-            statusBadge = `<span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-500/20 text-red-400">En prêt</span>`;
-            actionHtml = `<button class="btn-restituer bg-green-600 hover:bg-green-700 text-white text-xs px-4 py-2 rounded-lg ml-4 transition" data-id="${itemId}" data-nom="${data.nom}">Restituer</button>`;
+            statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"><i class="fa-solid fa-clock"></i> En prêt</span>`;
+            actionHtml = `<button class="btn-restituer w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}" data-nom="${data.nom}"><i class="fa-solid fa-boxes-packing mr-2 pointer-events-none"></i>Restituer</button>`;
         }
 
         itemElement.innerHTML = `
             <div class="flex-1">
-                <a href="history.html?id=${itemId}" class="font-bold text-white hover:text-blue-400 underline decoration-slate-600 transition">${data.nom}</a>
-                <p class="text-sm text-slate-400">Réf: ${data.reference}</p>
+                <div class="flex items-center gap-3 mb-1">
+                    <a href="history.html?id=${itemId}" class="font-bold text-lg text-white hover:text-blue-400 transition-colors flex items-center gap-2 group">
+                        ${data.nom} <i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                    </a>
+                </div>
+                <div class="flex items-center gap-3">
+                    <p class="text-sm font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">Réf: ${data.reference}</p>
+                    ${statusBadge}
+                </div>
             </div>
-            <div class="flex items-center">
-                ${statusBadge}
+            <div class="flex items-center w-full sm:w-auto">
                 ${actionHtml}
             </div>
         `;
@@ -96,7 +117,7 @@ function renderInventory() {
     document.querySelectorAll('.btn-preter').forEach(button => {
         button.addEventListener('click', (e) => {
             currentItemId = e.target.getAttribute('data-id');
-            modalItemName.textContent = "Prêt : " + e.target.getAttribute('data-nom');
+            modalItemName.textContent = e.target.getAttribute('data-nom');
             document.getElementById('loan-date').valueAsDate = new Date();
             loanModal.classList.remove('hidden');
         });
@@ -105,7 +126,7 @@ function renderInventory() {
     document.querySelectorAll('.btn-restituer').forEach(button => {
         button.addEventListener('click', (e) => {
             currentItemId = e.target.getAttribute('data-id');
-            returnModalItemName.textContent = "Retour : " + e.target.getAttribute('data-nom');
+            returnModalItemName.textContent = e.target.getAttribute('data-nom');
             returnModal.classList.remove('hidden');
         });
     });
@@ -122,6 +143,7 @@ onSnapshot(collection(db, "materiel"), (snapshot) => {
 // --- Gestion des Modales et Cases à cocher ---
 const loanModal = document.getElementById('loan-modal');
 const closeLoanBtn = document.getElementById('close-modal-btn');
+const closeLoanIcon = document.getElementById('close-modal-icon-btn'); // Croix en haut
 const loanForm = document.getElementById('loan-form');
 const modalItemName = document.getElementById('modal-item-name');
 const noPhotoLoan = document.getElementById('no-photo-loan');
@@ -129,6 +151,7 @@ const equipmentPhoto = document.getElementById('equipment-photo');
 
 const returnModal = document.getElementById('return-modal');
 const closeReturnBtn = document.getElementById('close-return-modal-btn');
+const closeReturnIcon = document.getElementById('close-return-icon-btn'); // Croix en haut
 const returnForm = document.getElementById('return-form');
 const returnModalItemName = document.getElementById('return-modal-item-name');
 const noPhotoReturn = document.getElementById('no-photo-return');
@@ -136,10 +159,14 @@ const returnPhoto = document.getElementById('return-photo');
 
 let currentItemId = null;
 
-closeLoanBtn.addEventListener('click', () => { loanModal.classList.add('hidden'); loanForm.reset(); equipmentPhoto.disabled = false; });
-closeReturnBtn.addEventListener('click', () => { returnModal.classList.add('hidden'); returnForm.reset(); returnPhoto.disabled = false; });
+function closeLoan() { loanModal.classList.add('hidden'); loanForm.reset(); equipmentPhoto.disabled = false; }
+function closeReturn() { returnModal.classList.add('hidden'); returnForm.reset(); returnPhoto.disabled = false; }
 
-// Désactive le champ photo si la case est cochée
+closeLoanBtn.addEventListener('click', closeLoan);
+closeLoanIcon.addEventListener('click', closeLoan);
+closeReturnBtn.addEventListener('click', closeReturn);
+closeReturnIcon.addEventListener('click', closeReturn);
+
 noPhotoLoan.addEventListener('change', (e) => {
     equipmentPhoto.disabled = e.target.checked;
     if(e.target.checked) equipmentPhoto.value = "";
@@ -154,16 +181,15 @@ loanForm.addEventListener('submit', async (e) => {
     const file = equipmentPhoto.files[0];
     const isNoPhoto = noPhotoLoan.checked;
 
-    if (!file && !isNoPhoto) {
-        return alert("Veuillez prendre une photo, ou cocher la case si c'est impossible.");
-    }
+    if (!file && !isNoPhoto) return alert("Veuillez prendre une photo, ou cocher la case si c'est impossible.");
 
     const submitBtn = loanForm.querySelector('button[type="submit"]');
-    submitBtn.textContent = "Envoi en cours...";
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Envoi...';
     submitBtn.disabled = true;
 
     try {
-        let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible"; // Image par défaut
+        let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
 
         if (file && !isNoPhoto) {
             const formData = new FormData();
@@ -190,13 +216,11 @@ loanForm.addEventListener('submit', async (e) => {
         });
 
         await updateDoc(doc(db, "materiel", currentItemId), { statut: "En prêt" });
-        loanModal.classList.add('hidden');
-        loanForm.reset();
-        equipmentPhoto.disabled = false;
+        closeLoan();
     } catch (error) {
         alert("Erreur lors du prêt : " + error.message);
     } finally {
-        submitBtn.textContent = "Valider le prêt";
+        submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
 });
@@ -206,12 +230,11 @@ returnForm.addEventListener('submit', async (e) => {
     const file = returnPhoto.files[0];
     const isNoPhoto = noPhotoReturn.checked;
 
-    if (!file && !isNoPhoto) {
-        return alert("Veuillez prendre une photo, ou cocher la case si c'est impossible.");
-    }
+    if (!file && !isNoPhoto) return alert("Veuillez prendre une photo, ou cocher la case si c'est impossible.");
 
     const submitBtn = returnForm.querySelector('button[type="submit"]');
-    submitBtn.textContent = "Envoi en cours...";
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Envoi...';
     submitBtn.disabled = true;
 
     try {
@@ -235,14 +258,11 @@ returnForm.addEventListener('submit', async (e) => {
         });
 
         await updateDoc(doc(db, "materiel", currentItemId), { statut: "Disponible" });
-
-        returnModal.classList.add('hidden');
-        returnForm.reset();
-        returnPhoto.disabled = false;
+        closeReturn();
     } catch (error) {
         alert("Erreur lors du retour : " + error.message);
     } finally {
-        submitBtn.textContent = "Valider le retour";
+        submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
 });
