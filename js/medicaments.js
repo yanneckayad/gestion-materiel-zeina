@@ -15,7 +15,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ==========================================
+// Ne pas toucher à la version 2.4 ! Utiliser le bouton "Vider le cache" dans Paramètres après la mise à jour.
 const APP_VERSION = "2.4";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
@@ -24,22 +24,56 @@ if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     localStorage.setItem("zeina_version", APP_VERSION);
     signOut(auth).then(() => { window.location.replace("index.html"); });
 }
-// ==========================================
 
 onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
 });
 
+document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
+    signOut(auth).then(() => window.location.href = "index.html");
+});
+
+
+// ====================================================================
+// NOUVEAU : SYSTÈME D'ONGLETS (TABS)
+// ====================================================================
+const tabStock = document.getElementById('tab-stock');
+const tabPatients = document.getElementById('tab-patients');
+const viewStock = document.getElementById('view-stock');
+const viewPatients = document.getElementById('view-patients');
+
+tabStock.addEventListener('click', () => {
+    // Styling
+    tabStock.classList.replace('text-slate-400', 'bg-blue-600');
+    tabStock.classList.add('text-white', 'shadow-lg', 'shadow-blue-500/20');
+    tabPatients.classList.replace('bg-blue-600', 'text-slate-400');
+    tabPatients.classList.remove('text-white', 'shadow-lg', 'shadow-blue-500/20');
+    // Views
+    viewStock.classList.remove('hidden');
+    viewPatients.classList.add('hidden');
+});
+
+tabPatients.addEventListener('click', () => {
+    // Styling
+    tabPatients.classList.replace('text-slate-400', 'bg-blue-600');
+    tabPatients.classList.add('text-white', 'shadow-lg', 'shadow-blue-500/20');
+    tabStock.classList.replace('bg-blue-600', 'text-slate-400');
+    tabStock.classList.remove('text-white', 'shadow-lg', 'shadow-blue-500/20');
+    // Views
+    viewPatients.classList.remove('hidden');
+    viewStock.classList.add('hidden');
+});
+
+
+// ====================================================================
+// PARTIE 1 : STOCK PHARMACIE (Ton code existant inchangé)
+// ====================================================================
 let allMeds = [];
 let searchQuery = "";
 let currentFilter = "all";
 let currentMedId = null;
 let currentMedLots = [];
 let scannedBarcodeValue = "";
-
-document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
-    signOut(auth).then(() => window.location.href = "index.html");
-});
 
 document.getElementById('search-med').addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase();
@@ -458,3 +492,129 @@ onSnapshot(collection(db, "medicaments"), (snapshot) => {
     });
     renderMeds();
 });
+
+// ====================================================================
+// PARTIE 2 : PATIENTS PRIORITAIRES (Nouveau code)
+// ====================================================================
+const patientModal = document.getElementById('patient-modal');
+const patientForm = document.getElementById('patient-form');
+const patientsListEl = document.getElementById('patients-list');
+
+document.getElementById('btn-add-patient').addEventListener('click', () => {
+    patientModal.classList.remove('hidden');
+});
+
+document.getElementById('close-patient-modal').addEventListener('click', () => {
+    patientModal.classList.add('hidden');
+});
+
+document.getElementById('cancel-patient-btn').addEventListener('click', () => {
+    patientModal.classList.add('hidden');
+});
+
+patientForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const nom = document.getElementById('patient-name').value;
+    const medicamentBesoin = document.getElementById('patient-med').value;
+    const quantite = parseInt(document.getElementById('patient-qty').value);
+    const duree = document.getElementById('patient-duration').value;
+
+    const submitBtn = patientForm.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enregistrement...';
+    submitBtn.disabled = true;
+
+    try {
+        await addDoc(collection(db, "patients_chroniques"), {
+            nom: nom,
+            medicamentBesoin: medicamentBesoin,
+            quantite: quantite,
+            duree: duree,
+            membreEmail: auth.currentUser ? auth.currentUser.email : "Inconnu",
+            dateAjout: new Date()
+        });
+
+        patientForm.reset();
+        patientModal.classList.add('hidden');
+        alert("Patient prioritaire ajouté à la liste !");
+    } catch (error) {
+        alert("Erreur lors de l'ajout : " + error.message);
+    } finally {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+});
+
+// Écouteur en temps réel pour afficher les patients
+onSnapshot(collection(db, "patients_chroniques"), (snapshot) => {
+    let allPatients = [];
+    snapshot.forEach((doc) => {
+        allPatients.push({ id: doc.id, data: doc.data() });
+    });
+
+    // Tri du plus récent au plus ancien
+    allPatients.sort((a, b) => b.data.dateAjout.toDate() - a.data.dateAjout.toDate());
+
+    patientsListEl.innerHTML = "";
+
+    if (allPatients.length === 0) {
+        patientsListEl.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-10 text-slate-500 animate-fade-in">
+                <i class="fa-solid fa-clipboard-check text-4xl mb-3 opacity-50"></i>
+                <p>Aucun patient en attente.</p>
+            </div>
+        `;
+        return;
+    }
+
+    allPatients.forEach((item, index) => {
+        const data = item.data;
+        const id = item.id;
+
+        // Style du badge selon la durée
+        let badgeHtml = '';
+        if (data.duree.includes("Chronique")) {
+            badgeHtml = `<span class="px-2.5 py-1 text-[10px] font-bold uppercase rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20"><i class="fa-solid fa-infinity mr-1"></i> Chronique</span>`;
+        } else {
+            badgeHtml = `<span class="px-2.5 py-1 text-[10px] font-bold uppercase rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"><i class="fa-solid fa-bolt mr-1"></i> Urgent</span>`;
+        }
+
+        const dateAjout = data.dateAjout.toDate().toLocaleDateString('fr-FR');
+
+        const card = document.createElement('div');
+        card.className = "bg-slate-900/60 p-5 rounded-xl border border-slate-700/50 hover:border-slate-500 transition-all shadow-sm flex flex-col justify-between animate-slide-up";
+        card.style.animationDelay = `${index * 50}ms`;
+
+        card.innerHTML = `
+            <div>
+                <div class="flex justify-between items-start mb-3">
+                    <h3 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-user text-slate-400"></i> ${data.nom}</h3>
+                    ${badgeHtml}
+                </div>
+                <div class="space-y-1 mb-4">
+                    <p class="text-sm text-slate-300"><span class="text-slate-500">A besoin de :</span> <strong class="text-blue-400">${data.medicamentBesoin}</strong></p>
+                    <p class="text-sm text-slate-300"><span class="text-slate-500">Quantité :</span> <strong class="text-white">${data.quantite} boîte(s)</strong></p>
+                </div>
+                <p class="text-xs text-slate-500 font-mono"><i class="fa-regular fa-calendar mr-1"></i> Ajouté le ${dateAjout}</p>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-700/50">
+                <button onclick="removePatient('${id}', '${data.nom.replace(/'/g, "\\'")}')" class="w-full bg-emerald-600/10 hover:bg-emerald-600 active:scale-95 text-emerald-400 hover:text-white border border-emerald-500/30 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-check"></i> Besoin satisfait
+                </button>
+            </div>
+        `;
+        patientsListEl.appendChild(card);
+    });
+});
+
+// Fonction pour retirer un patient de la liste
+window.removePatient = async function(id, nom) {
+    if (confirm(`Le besoin de ${nom} a-t-il été satisfait ? Il sera retiré de la liste d'attente.`)) {
+        try {
+            await deleteDoc(doc(db, "patients_chroniques", id));
+        } catch(e) {
+            alert("Erreur lors de la suppression : " + e.message);
+        }
+    }
+};
