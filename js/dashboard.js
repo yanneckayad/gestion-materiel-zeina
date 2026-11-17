@@ -50,7 +50,6 @@ addItemForm.addEventListener('submit', async (e) => {
     }
 });
 
-// CORRECTION APPLIQUÉE ICI : String(texte)
 function enleverAccents(texte) {
     if (!texte) return "";
     return String(texte).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -180,6 +179,15 @@ function renderInventory() {
         });
     });
 }
+
+// 🔥 LE "MOTEUR" FIREBASE QUI AVAIT DISPARU EST DE RETOUR ICI 🔥
+onSnapshot(collection(db, "materiel"), (snapshot) => {
+    allMateriel = [];
+    snapshot.forEach((doc) => {
+        allMateriel.push({ id: doc.id, data: doc.data() });
+    });
+    renderInventory();
+});
 
 function genererBonDePretPDF(equipementNom, equipementRef, infosPret) {
     const { jsPDF } = window.jspdf;
