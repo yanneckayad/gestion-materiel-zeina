@@ -23,7 +23,7 @@ let allMateriel = [];
 let currentFilter = "all";
 let searchQuery = "";
 let currentItemId;
-let currentItemRef; // NOUVEAU : Pour stocker la référence pour le PDF
+let currentItemRef;
 
 document.getElementById('logout-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
@@ -50,9 +50,10 @@ addItemForm.addEventListener('submit', async (e) => {
     }
 });
 
+// CORRECTION APPLIQUÉE ICI : String(texte)
 function enleverAccents(texte) {
     if (!texte) return "";
-    return texte.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return String(texte).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
 document.getElementById('search-bar').addEventListener('input', (e) => {
@@ -113,7 +114,6 @@ function renderInventory() {
             actionHtml = `
                 <div class="flex gap-2 w-full sm:w-auto">
                     <button class="btn-panne bg-slate-700 hover:bg-orange-500 text-slate-300 hover:text-white text-sm px-4 py-2.5 rounded-lg shadow-lg transition-all" data-id="${itemId}" title="Signaler une panne"><i class="fa-solid fa-wrench pointer-events-none"></i></button>
-                    <!-- Ajout de data-ref pour le PDF -->
                     <button class="btn-preter flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}" data-nom="${data.nom}" data-ref="${data.reference}"><i class="fa-solid fa-hand-holding-heart mr-2 pointer-events-none"></i>Prêter</button>
                 </div>
             `;
@@ -147,7 +147,7 @@ function renderInventory() {
     document.querySelectorAll('.btn-preter').forEach(button => {
         button.addEventListener('click', (e) => {
             currentItemId = e.target.getAttribute('data-id');
-            currentItemRef = e.target.getAttribute('data-ref'); // Sauvegarde la réf pour le PDF
+            currentItemRef = e.target.getAttribute('data-ref');
             modalItemName.textContent = e.target.getAttribute('data-nom');
             document.getElementById('loan-date').valueAsDate = new Date();
             loanModal.classList.remove('hidden');
@@ -181,34 +181,30 @@ function renderInventory() {
     });
 }
 
-// --- NOUVEAU : Fonction de création du PDF ---
 function genererBonDePretPDF(equipementNom, equipementRef, infosPret) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // Titres
     doc.setFontSize(22);
-    doc.setTextColor(30, 64, 175); // Bleu Zeïna
-    doc.text("La Lumière de l'Ange Zeïna", 105, 20, { align: "center" });
+    doc.setTextColor(30, 64, 175);
+    doc.text("La Lumiere de l'Ange Zeina", 105, 20, { align: "center" });
 
     doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
-    doc.text("BON DE PRÊT DE MATÉRIEL MÉDICAL", 105, 30, { align: "center" });
+    doc.text("BON DE PRET DE MATERIEL MEDICAL", 105, 30, { align: "center" });
 
     doc.setLineWidth(0.5);
     doc.line(20, 35, 190, 35);
 
-    // Bloc Matériel
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("Informations sur le matériel :", 20, 50);
+    doc.text("Informations sur le materiel :", 20, 50);
     doc.setFont("helvetica", "normal");
     doc.text(`Equipement : ${equipementNom}`, 20, 60);
     doc.text(`Reference : ${equipementRef}`, 20, 70);
     doc.text(`Date du pret : ${infosPret.dateDebutPret}`, 20, 80);
     doc.text(`Duree prevue : ${infosPret.duree}`, 20, 90);
 
-    // Bloc Malade
     doc.setFont("helvetica", "bold");
     doc.text("Informations du beneficiaire :", 110, 50);
     doc.setFont("helvetica", "normal");
@@ -219,10 +215,8 @@ function genererBonDePretPDF(equipementNom, equipementRef, infosPret) {
 
     doc.line(20, 100, 190, 100);
 
-    // Bénévole
     doc.text(`Benevole ayant effectue le pret : ${infosPret.membreNom}`, 20, 110);
 
-    // Mentions légales
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     doc.text("Conditions de pret :", 20, 130);
@@ -230,7 +224,6 @@ function genererBonDePretPDF(equipementNom, equipementRef, infosPret) {
     doc.text("- Le beneficiaire s'engage a en prendre soin et a le restituer dans son etat initial.", 20, 145);
     doc.text("- En cas de panne, veuillez contacter l'association immediatement.", 20, 150);
 
-    // Espace signatures
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "italic");
@@ -241,10 +234,7 @@ function genererBonDePretPDF(equipementNom, equipementRef, infosPret) {
     doc.setFontSize(12);
     doc.text("Signature du benevole", 130, 180);
 
-    // Nettoyage du nom pour le nom du fichier
     const nomFichier = `Bon_de_pret_${infosPret.patientNom.replace(/\s+/g, '_')}.pdf`;
-
-    // Lance le téléchargement
     doc.save(nomFichier);
 }
 
@@ -303,7 +293,6 @@ loanForm.addEventListener('submit', async (e) => {
     submitBtn.disabled = true;
 
     try {
-        // 1. On rassemble toutes les infos saisies
         const loanData = {
             dateDebutPret: document.getElementById('loan-date').value,
             membreNom: document.getElementById('member-name').value,
@@ -314,13 +303,11 @@ loanForm.addEventListener('submit', async (e) => {
             duree: document.getElementById('loan-duration').value
         };
 
-        // 2. Gestion de l'image
         let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
         if (file && !isNoPhoto) {
             imageUrl = await uploadToCloudinary(file);
         }
 
-        // 3. Enregistrement dans Firebase
         await addDoc(collection(db, "prets"), {
             materielId: currentItemId,
             dateDebutPret: loanData.dateDebutPret,
@@ -337,7 +324,6 @@ loanForm.addEventListener('submit', async (e) => {
 
         await updateDoc(doc(db, "materiel", currentItemId), { statut: "En prêt" });
 
-        // 4. NOUVEAU : On génère le PDF automatiquement à la fin
         genererBonDePretPDF(modalItemName.textContent, currentItemRef, loanData);
 
         closeLoan();
