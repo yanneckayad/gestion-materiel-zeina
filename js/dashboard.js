@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Ta configuration Firebase
@@ -15,6 +15,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// --- Sécurité : Vérifie si l'utilisateur est bien connecté ---
+onAuthStateChanged(auth, (user) => {
+    if (!user) {
+        // Si personne n'est connecté, on le renvoie à l'accueil
+        window.location.href = "index.html";
+    }
+});
 
 let allMateriel = [];
 let currentFilter = "all";
@@ -195,7 +203,6 @@ loanForm.addEventListener('submit', async (e) => {
             const formData = new FormData();
             formData.append("file", file);
             formData.append("upload_preset", "zeina_photos");
-            // ⚠️ REMPLACE TON_CLOUD_NAME
             const cloudinaryResponse = await fetch("https://api.cloudinary.com/v1_1/qljytaa3/image/upload", { method: "POST", body: formData });
             const cloudinaryData = await cloudinaryResponse.json();
             imageUrl = cloudinaryData.secure_url;
@@ -212,7 +219,8 @@ loanForm.addEventListener('submit', async (e) => {
             duree: document.getElementById('loan-duration').value,
             photoSortie: imageUrl,
             datePret: new Date(),
-            membreEmail: auth.currentUser.email
+            // CORRECTION ICI (déjà appliquée)
+            membreEmail: auth.currentUser ? auth.currentUser.email : "Email introuvable"
         });
 
         await updateDoc(doc(db, "materiel", currentItemId), { statut: "En prêt" });
@@ -244,7 +252,6 @@ returnForm.addEventListener('submit', async (e) => {
             const formData = new FormData();
             formData.append("file", file);
             formData.append("upload_preset", "zeina_photos");
-            // ⚠️ REMPLACE TON_CLOUD_NAME
             const cloudinaryResponse = await fetch("https://api.cloudinary.com/v1_1/qljytaa3/image/upload", { method: "POST", body: formData });
             const cloudinaryData = await cloudinaryResponse.json();
             imageUrl = cloudinaryData.secure_url;
@@ -254,7 +261,8 @@ returnForm.addEventListener('submit', async (e) => {
             materielId: currentItemId,
             photoRetour: imageUrl,
             dateRetour: new Date(),
-            membreEmail: auth.currentUser.email
+            // CORRECTION ICI (ajoutée pour le retour)
+            membreEmail: auth.currentUser ? auth.currentUser.email : "Email introuvable"
         });
 
         await updateDoc(doc(db, "materiel", currentItemId), { statut: "Disponible" });
