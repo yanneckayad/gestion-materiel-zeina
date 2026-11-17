@@ -23,6 +23,7 @@ let allMateriel = [];
 let currentFilter = "all";
 let searchQuery = "";
 let currentItemId;
+let currentItemRef; // NOUVEAU : Pour stocker la référence pour le PDF
 
 document.getElementById('logout-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
@@ -62,7 +63,7 @@ document.getElementById('search-bar').addEventListener('input', (e) => {
 const btnFilterAll = document.getElementById('filter-all');
 const btnFilterAvailable = document.getElementById('filter-available');
 const btnFilterLoaned = document.getElementById('filter-loaned');
-const btnFilterRepair = document.getElementById('filter-repair'); // Nouveau bouton
+const btnFilterRepair = document.getElementById('filter-repair');
 
 function updateFilterUI(activeBtn) {
     [btnFilterAll, btnFilterAvailable, btnFilterLoaned, btnFilterRepair].forEach(btn => {
@@ -109,18 +110,17 @@ function renderInventory() {
 
         if (data.statut === "Disponible") {
             statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-circle-check"></i> Disponible</span>`;
-            // Ajout du bouton de signalement de panne avec l'icône clé à molette
             actionHtml = `
                 <div class="flex gap-2 w-full sm:w-auto">
                     <button class="btn-panne bg-slate-700 hover:bg-orange-500 text-slate-300 hover:text-white text-sm px-4 py-2.5 rounded-lg shadow-lg transition-all" data-id="${itemId}" title="Signaler une panne"><i class="fa-solid fa-wrench pointer-events-none"></i></button>
-                    <button class="btn-preter flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}" data-nom="${data.nom}"><i class="fa-solid fa-hand-holding-heart mr-2 pointer-events-none"></i>Prêter</button>
+                    <!-- Ajout de data-ref pour le PDF -->
+                    <button class="btn-preter flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}" data-nom="${data.nom}" data-ref="${data.reference}"><i class="fa-solid fa-hand-holding-heart mr-2 pointer-events-none"></i>Prêter</button>
                 </div>
             `;
         } else if (data.statut === "En prêt") {
             statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"><i class="fa-solid fa-clock"></i> En prêt</span>`;
             actionHtml = `<button class="btn-restituer w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}" data-nom="${data.nom}"><i class="fa-solid fa-boxes-packing mr-2 pointer-events-none"></i>Restituer</button>`;
         } else if (data.statut === "En réparation") {
-            // Nouveau statut En réparation
             statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20"><i class="fa-solid fa-triangle-exclamation"></i> En panne</span>`;
             actionHtml = `<button class="btn-repare w-full sm:w-auto bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-orange-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}"><i class="fa-solid fa-check-double mr-2 pointer-events-none"></i>Marquer Réparé</button>`;
         }
@@ -147,6 +147,7 @@ function renderInventory() {
     document.querySelectorAll('.btn-preter').forEach(button => {
         button.addEventListener('click', (e) => {
             currentItemId = e.target.getAttribute('data-id');
+            currentItemRef = e.target.getAttribute('data-ref'); // Sauvegarde la réf pour le PDF
             modalItemName.textContent = e.target.getAttribute('data-nom');
             document.getElementById('loan-date').valueAsDate = new Date();
             loanModal.classList.remove('hidden');
@@ -161,7 +162,6 @@ function renderInventory() {
         });
     });
 
-    // --- NOUVEAU : Logique pour les boutons de réparation ---
     document.querySelectorAll('.btn-panne').forEach(button => {
         button.addEventListener('click', async (e) => {
             if (confirm("Confirmer la mise en panne de ce matériel ? Il ne pourra plus être prêté.")) {
@@ -181,13 +181,72 @@ function renderInventory() {
     });
 }
 
-onSnapshot(collection(db, "materiel"), (snapshot) => {
-    allMateriel = [];
-    snapshot.forEach((doc) => {
-        allMateriel.push({ id: doc.id, data: doc.data() });
-    });
-    renderInventory();
-});
+// --- NOUVEAU : Fonction de création du PDF ---
+function genererBonDePretPDF(equipementNom, equipementRef, infosPret) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Titres
+    doc.setFontSize(22);
+    doc.setTextColor(30, 64, 175); // Bleu Zeïna
+    doc.text("La Lumière de l'Ange Zeïna", 105, 20, { align: "center" });
+
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text("BON DE PRÊT DE MATÉRIEL MÉDICAL", 105, 30, { align: "center" });
+
+    doc.setLineWidth(0.5);
+    doc.line(20, 35, 190, 35);
+
+    // Bloc Matériel
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Informations sur le matériel :", 20, 50);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Equipement : ${equipementNom}`, 20, 60);
+    doc.text(`Reference : ${equipementRef}`, 20, 70);
+    doc.text(`Date du pret : ${infosPret.dateDebutPret}`, 20, 80);
+    doc.text(`Duree prevue : ${infosPret.duree}`, 20, 90);
+
+    // Bloc Malade
+    doc.setFont("helvetica", "bold");
+    doc.text("Informations du beneficiaire :", 110, 50);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nom : ${infosPret.patientNom}`, 110, 60);
+    doc.text(`Piece d'identite : ${infosPret.patientPieceId}`, 110, 70);
+    doc.text(`Telephone : ${infosPret.patientTelephone}`, 110, 80);
+    doc.text(`Ne(e) le : ${infosPret.patientDateNaissance}`, 110, 90);
+
+    doc.line(20, 100, 190, 100);
+
+    // Bénévole
+    doc.text(`Benevole ayant effectue le pret : ${infosPret.membreNom}`, 20, 110);
+
+    // Mentions légales
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Conditions de pret :", 20, 130);
+    doc.text("- Le materiel prete reste l'entiere propriete de l'association.", 20, 140);
+    doc.text("- Le beneficiaire s'engage a en prendre soin et a le restituer dans son etat initial.", 20, 145);
+    doc.text("- En cas de panne, veuillez contacter l'association immediatement.", 20, 150);
+
+    // Espace signatures
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "italic");
+    doc.text("Signature du beneficiaire", 40, 180);
+    doc.setFontSize(9);
+    doc.text("(precedee de la mention 'Lu et approuve')", 35, 185);
+
+    doc.setFontSize(12);
+    doc.text("Signature du benevole", 130, 180);
+
+    // Nettoyage du nom pour le nom du fichier
+    const nomFichier = `Bon_de_pret_${infosPret.patientNom.replace(/\s+/g, '_')}.pdf`;
+
+    // Lance le téléchargement
+    doc.save(nomFichier);
+}
 
 const loanModal = document.getElementById('loan-modal');
 const closeLoanBtn = document.getElementById('close-modal-btn');
@@ -240,31 +299,47 @@ loanForm.addEventListener('submit', async (e) => {
 
     const submitBtn = loanForm.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Envoi...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Validation...';
     submitBtn.disabled = true;
 
     try {
-        let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
-
-        if (file && !isNoPhoto) {
-            imageUrl = await uploadToCloudinary(file);
-        }
-
-        await addDoc(collection(db, "prets"), {
-            materielId: currentItemId,
+        // 1. On rassemble toutes les infos saisies
+        const loanData = {
             dateDebutPret: document.getElementById('loan-date').value,
             membreNom: document.getElementById('member-name').value,
             patientPieceId: document.getElementById('patient-id').value,
             patientNom: document.getElementById('patient-name').value,
             patientTelephone: document.getElementById('patient-phone').value,
             patientDateNaissance: document.getElementById('patient-dob').value,
-            duree: document.getElementById('loan-duration').value,
+            duree: document.getElementById('loan-duration').value
+        };
+
+        // 2. Gestion de l'image
+        let imageUrl = "https://placehold.co/400x300/1e293b/94a3b8?text=Photo+non+disponible";
+        if (file && !isNoPhoto) {
+            imageUrl = await uploadToCloudinary(file);
+        }
+
+        // 3. Enregistrement dans Firebase
+        await addDoc(collection(db, "prets"), {
+            materielId: currentItemId,
+            dateDebutPret: loanData.dateDebutPret,
+            membreNom: loanData.membreNom,
+            patientPieceId: loanData.patientPieceId,
+            patientNom: loanData.patientNom,
+            patientTelephone: loanData.patientTelephone,
+            patientDateNaissance: loanData.patientDateNaissance,
+            duree: loanData.duree,
             photoSortie: imageUrl,
             datePret: new Date(),
             membreEmail: auth.currentUser ? auth.currentUser.email : "Email introuvable"
         });
 
         await updateDoc(doc(db, "materiel", currentItemId), { statut: "En prêt" });
+
+        // 4. NOUVEAU : On génère le PDF automatiquement à la fin
+        genererBonDePretPDF(modalItemName.textContent, currentItemRef, loanData);
+
         closeLoan();
     } catch (error) {
         alert("Erreur lors du prêt : " + error.message);
