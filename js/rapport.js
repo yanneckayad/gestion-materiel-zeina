@@ -177,7 +177,7 @@ async function generateReport() {
 }
 
 // =========================================================================
-// NOVEAU MOTEUR DE GÉNÉRATION PDF 100% PRO ET STYLISÉ
+// GÉNÉRATION PDF : CORRIGÉ
 // =========================================================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
@@ -188,7 +188,7 @@ if(btnDownloadPdf) {
         const startStr = document.getElementById('date-debut').value;
         const endStr = document.getElementById('date-fin').value;
 
-        // Génération des badges colorés (sans FontAwesome pour éviter les bugs)
+        // Génération des badges colorés (sans icônes compliquées pour le PDF)
         function getBadgeHtml(type) {
             if (type === 'pret') return `<span style="background:#eff6ff; color:#2563eb; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">PRÊT</span>`;
             if (type === 'retour') return `<span style="background:#ecfdf5; color:#10b981; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">RETOUR</span>`;
@@ -197,7 +197,6 @@ if(btnDownloadPdf) {
             return '';
         }
 
-        // Création du journal sous forme de vrai tableau propre
         let trs = "";
         if (currentAllEvents.length === 0) {
             trs = `<tr><td colspan="4" style="padding: 20px; text-align: center; color: #94a3b8;">Aucune opération sur cette période.</td></tr>`;
@@ -215,10 +214,9 @@ if(btnDownloadPdf) {
             }).join('');
         }
 
-        // Création d'un HTML sur mesure, invisible sur l'écran, parfait pour le PDF
+        // Création du HTML pur (fond blanc propre, sans dark mode)
         const htmlContent = `
-        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; padding: 20px; background: white;">
-            
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b;">
             <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px;">
                 <h1 style="color: #1e293b; font-size: 26px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
                 <h2 style="color: #64748b; font-size: 18px; margin: 5px 0 0 0;">Rapport d'activité détaillé</h2>
@@ -229,19 +227,19 @@ if(btnDownloadPdf) {
             <div style="display: flex; gap: 15px; margin-bottom: 35px;">
                 <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; text-align: center;">
                     <h3 style="margin: 0; font-size: 24px; color: #2563eb;">${currentStats.prets}</h3>
-                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts de matériel</p>
+                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts</p>
                 </div>
                 <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 15px; border-radius: 8px; text-align: center;">
                     <h3 style="margin: 0; font-size: 24px; color: #10b981;">${currentStats.retours}</h3>
-                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours de matériel</p>
+                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours</p>
                 </div>
                 <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 15px; border-radius: 8px; text-align: center;">
                     <h3 style="margin: 0; font-size: 24px; color: #d97706;">${currentStats.dons}</h3>
-                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons (Boîtes)</p>
+                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons</p>
                 </div>
                 <div style="flex: 1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 15px; border-radius: 8px; text-align: center;">
                     <h3 style="margin: 0; font-size: 24px; color: #9333ea;">${currentStats.ajouts}</h3>
-                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu (Boîtes)</p>
+                    <p style="margin: 5px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu</p>
                 </div>
             </div>
 
@@ -252,8 +250,8 @@ if(btnDownloadPdf) {
                     <tr style="background: #f8fafc;">
                         <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
                         <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
-                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet concerné</th>
-                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails (Patient / Bénévole)</th>
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
+                        <th style="padding: 10px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -267,16 +265,12 @@ if(btnDownloadPdf) {
         </div>
         `;
 
-        // Création d'un élément temporaire caché pour html2pdf
-        const element = document.createElement('div');
-        element.style.position = 'absolute';
-        element.style.top = '-9999px';
-        element.style.left = '-9999px';
-        element.style.width = '800px';
-        element.innerHTML = htmlContent;
-        document.body.appendChild(element);
+        // Création de l'élément wrapper (NON ajouté au document, pour éviter les bugs)
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = htmlContent;
+        wrapper.style.width = '800px';
+        wrapper.style.background = 'white';
 
-        // Options PDF en Qualité Pro
         const opt = {
             margin:       10,
             filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
@@ -288,11 +282,10 @@ if(btnDownloadPdf) {
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
         btn.disabled = true;
 
-        // Exécution et nettoyage
-        html2pdf().set(opt).from(element).save().then(() => {
+        // On donne l'élément détaché à l'outil PDF
+        html2pdf().set(opt).from(wrapper).save().then(() => {
             btn.innerHTML = originalText;
             btn.disabled = false;
-            document.body.removeChild(element);
         });
     });
 }
