@@ -176,7 +176,7 @@ async function generateReport() {
 }
 
 // =========================================================================
-// NOUVEAU GÉNÉRATEUR PDF NATIF (IMMUNISÉ AUX COUPURES & PAGES BLANCHES)
+// GÉNÉRATEUR PDF : AVEC DE MAGNIFIQUES BADGES COLORÉS
 // =========================================================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
@@ -259,34 +259,54 @@ if(btnDownloadPdf) {
 
                 const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-                doc.setFontSize(9);
+                // === DESSIN DES BADGES COLORÉS ===
+                doc.setFontSize(8);
                 doc.setFont("helvetica", "bold");
 
-                if (ev.type === 'pret') doc.setTextColor(37, 99, 235);
-                else if (ev.type === 'retour') doc.setTextColor(16, 185, 129);
-                else if (ev.type === 'don') doc.setTextColor(217, 119, 6);
-                else if (ev.type === 'ajout') doc.setTextColor(147, 51, 234);
+                let badgeW = 14;
+                let badgeText = "";
 
-                doc.text(`[${cleanText(ev.type).toUpperCase()}]`, 15, yPos);
+                if (ev.type === 'pret') {
+                    doc.setFillColor(239, 246, 255); doc.setTextColor(37, 99, 235); badgeText = "PRET"; badgeW = 14;
+                } else if (ev.type === 'retour') {
+                    doc.setFillColor(236, 253, 245); doc.setTextColor(16, 185, 129); badgeText = "RETOUR"; badgeW = 20;
+                } else if (ev.type === 'don') {
+                    doc.setFillColor(255, 251, 235); doc.setTextColor(217, 119, 6); badgeText = "DON"; badgeW = 12;
+                } else if (ev.type === 'ajout') {
+                    doc.setFillColor(250, 245, 255); doc.setTextColor(147, 51, 234); badgeText = "STOCK"; badgeW = 16;
+                }
 
+                // On dessine le fond arrondi de la couleur correspondante
+                doc.roundedRect(15, yPos - 3.5, badgeW, 5, 1, 1, "F");
+                // On écrit le texte au centre du badge
+                doc.text(badgeText, 15 + (badgeW / 2), yPos, { align: "center" });
+                // ===================================
+
+                // Date
                 doc.setFont("helvetica", "normal");
+                doc.setFontSize(9);
                 doc.setTextColor(100, 100, 100);
-                doc.text(dateStr, 38, yPos);
+                doc.text(dateStr, 37, yPos);
 
+                // Objet
                 doc.setFont("helvetica", "bold");
                 doc.setTextColor(30, 41, 59);
-                doc.text(cleanText(ev.titre), 65, yPos);
+                doc.text(cleanText(ev.titre), 63, yPos);
 
+                // Détails (Ligne en dessous)
                 yPos += 5;
                 doc.setFont("helvetica", "normal");
                 doc.setTextColor(100, 100, 100);
 
-                const splitDesc = doc.splitTextToSize(cleanText(ev.desc.replace(' | ', ' - ')), 125);
-                doc.text(splitDesc, 65, yPos);
+                // Coupe proprement le texte sans dépasser du PDF
+                const splitDesc = doc.splitTextToSize(cleanText(ev.desc.replace(' | ', ' - ')), 130);
+                doc.text(splitDesc, 63, yPos);
 
                 yPos += (splitDesc.length * 4) + 2;
 
-                doc.setDrawColor(226, 232, 240);
+                // Ligne de séparation douce
+                doc.setDrawColor(241, 245, 249);
+                doc.setLineWidth(0.5);
                 doc.line(15, yPos, 195, yPos);
                 yPos += 6;
             });
