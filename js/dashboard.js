@@ -49,14 +49,11 @@ addItemForm.addEventListener('submit', async (e) => {
     }
 });
 
-// --- NOUVEAU : Fonction magique pour enlever les accents ---
 function enleverAccents(texte) {
     if (!texte) return "";
-    // Transforme "é" en "e", "à" en "a", et met tout en minuscules
     return texte.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-// Mise à jour de la barre de recherche avec le nettoyeur d'accents
 document.getElementById('search-bar').addEventListener('input', (e) => {
     searchQuery = enleverAccents(e.target.value);
     renderInventory();
@@ -65,9 +62,10 @@ document.getElementById('search-bar').addEventListener('input', (e) => {
 const btnFilterAll = document.getElementById('filter-all');
 const btnFilterAvailable = document.getElementById('filter-available');
 const btnFilterLoaned = document.getElementById('filter-loaned');
+const btnFilterRepair = document.getElementById('filter-repair'); // Nouveau bouton
 
 function updateFilterUI(activeBtn) {
-    [btnFilterAll, btnFilterAvailable, btnFilterLoaned].forEach(btn => {
+    [btnFilterAll, btnFilterAvailable, btnFilterLoaned, btnFilterRepair].forEach(btn => {
         btn.classList.remove('bg-slate-700', 'text-white', 'shadow-md');
         btn.classList.add('text-slate-400');
     });
@@ -78,19 +76,17 @@ function updateFilterUI(activeBtn) {
 btnFilterAll.addEventListener('click', () => { currentFilter = "all"; updateFilterUI(btnFilterAll); renderInventory(); });
 btnFilterAvailable.addEventListener('click', () => { currentFilter = "Disponible"; updateFilterUI(btnFilterAvailable); renderInventory(); });
 btnFilterLoaned.addEventListener('click', () => { currentFilter = "En prêt"; updateFilterUI(btnFilterLoaned); renderInventory(); });
+btnFilterRepair.addEventListener('click', () => { currentFilter = "En réparation"; updateFilterUI(btnFilterRepair); renderInventory(); });
 
 const inventoryList = document.getElementById('inventory-list');
 
 function renderInventory() {
     inventoryList.innerHTML = "";
 
-    // NOUVEAU : On utilise la fonction enleverAccents pour comparer
     const filteredList = allMateriel.filter(item => {
         const matchStatus = currentFilter === "all" || item.data.statut === currentFilter;
-
         const nomPropre = enleverAccents(item.data.nom);
         const refPropre = enleverAccents(item.data.reference);
-
         const matchSearch = nomPropre.includes(searchQuery) || refPropre.includes(searchQuery);
 
         return matchStatus && matchSearch;
@@ -113,10 +109,20 @@ function renderInventory() {
 
         if (data.statut === "Disponible") {
             statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-circle-check"></i> Disponible</span>`;
-            actionHtml = `<button class="btn-preter w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}" data-nom="${data.nom}"><i class="fa-solid fa-hand-holding-heart mr-2 pointer-events-none"></i>Prêter</button>`;
-        } else {
+            // Ajout du bouton de signalement de panne avec l'icône clé à molette
+            actionHtml = `
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <button class="btn-panne bg-slate-700 hover:bg-orange-500 text-slate-300 hover:text-white text-sm px-4 py-2.5 rounded-lg shadow-lg transition-all" data-id="${itemId}" title="Signaler une panne"><i class="fa-solid fa-wrench pointer-events-none"></i></button>
+                    <button class="btn-preter flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-blue-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}" data-nom="${data.nom}"><i class="fa-solid fa-hand-holding-heart mr-2 pointer-events-none"></i>Prêter</button>
+                </div>
+            `;
+        } else if (data.statut === "En prêt") {
             statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"><i class="fa-solid fa-clock"></i> En prêt</span>`;
             actionHtml = `<button class="btn-restituer w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}" data-nom="${data.nom}"><i class="fa-solid fa-boxes-packing mr-2 pointer-events-none"></i>Restituer</button>`;
+        } else if (data.statut === "En réparation") {
+            // Nouveau statut En réparation
+            statusBadge = `<span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20"><i class="fa-solid fa-triangle-exclamation"></i> En panne</span>`;
+            actionHtml = `<button class="btn-repare w-full sm:w-auto bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-orange-500/20 hover:-translate-y-0.5 transition-all" data-id="${itemId}"><i class="fa-solid fa-check-double mr-2 pointer-events-none"></i>Marquer Réparé</button>`;
         }
 
         itemElement.innerHTML = `
@@ -131,7 +137,7 @@ function renderInventory() {
                     ${statusBadge}
                 </div>
             </div>
-            <div class="flex items-center w-full sm:w-auto">
+            <div class="flex items-center w-full sm:w-auto mt-3 sm:mt-0">
                 ${actionHtml}
             </div>
         `;
@@ -152,6 +158,25 @@ function renderInventory() {
             currentItemId = e.target.getAttribute('data-id');
             returnModalItemName.textContent = e.target.getAttribute('data-nom');
             returnModal.classList.remove('hidden');
+        });
+    });
+
+    // --- NOUVEAU : Logique pour les boutons de réparation ---
+    document.querySelectorAll('.btn-panne').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            if (confirm("Confirmer la mise en panne de ce matériel ? Il ne pourra plus être prêté.")) {
+                const id = e.target.getAttribute('data-id');
+                await updateDoc(doc(db, "materiel", id), { statut: "En réparation" });
+            }
+        });
+    });
+
+    document.querySelectorAll('.btn-repare').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            if (confirm("Le matériel a-t-il bien été réparé et est-il prêt à l'emploi ?")) {
+                const id = e.target.getAttribute('data-id');
+                await updateDoc(doc(db, "materiel", id), { statut: "Disponible" });
+            }
         });
     });
 }
