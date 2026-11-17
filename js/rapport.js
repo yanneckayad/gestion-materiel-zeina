@@ -15,7 +15,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Version 2.4 maintenue. On utilise le bouton des Paramètres pour vider le cache !
+// Toujours version 2.4 (On utilisera le bouton dans Paramètres pour vider le cache)
 const APP_VERSION = "2.4";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
@@ -177,7 +177,7 @@ async function generateReport() {
 }
 
 // =========================================================================
-// MOTEUR PDF DÉFINITIF : TECHNIQUE DU Z-INDEX POUR MOBILE
+// MOTEUR PDF INFAILLIBLE : TECHNIQUE DE L'ÉCRAN DE CHARGEMENT
 // =========================================================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
@@ -206,17 +206,15 @@ if(btnDownloadPdf) {
                     <tr style="border-bottom: 1px solid #e2e8f0;">
                         <td style="width: 15%; padding: 12px 6px; color: #475569; vertical-align: top;">${dateStr}</td>
                         <td style="width: 12%; padding: 12px 6px; vertical-align: top;">${getBadgeHtml(ev.type)}</td>
-                        <td style="width: 35%; padding: 12px 6px; font-weight: bold; color: #1e293b; vertical-align: top; word-break: break-word; white-space: normal;">${ev.titre}</td>
-                        <td style="width: 38%; padding: 12px 6px; color: #64748b; line-height: 1.5; vertical-align: top; word-break: break-word; white-space: normal;">${ev.desc.replace(' | ', '<br>')}</td>
+                        <td style="width: 33%; padding: 12px 6px; font-weight: bold; color: #1e293b; vertical-align: top; word-break: break-word;">${ev.titre}</td>
+                        <td style="width: 40%; padding: 12px 6px; color: #64748b; line-height: 1.5; vertical-align: top; word-break: break-word;">${ev.desc.replace(' | ', '<br>')}</td>
                     </tr>
                 `;
             }).join('');
         }
 
-        // Le container a une largeur STRICTE de 794px (Standard A4 à 96 DPI)
         const htmlString = `
-        <div id="pdf-export-layer" style="width: 794px; background: white; padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
-            
+        <div style="width: 800px; background: white; padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
             <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px;">
                 <h1 style="color: #1e293b; font-size: 26px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
                 <h2 style="color: #64748b; font-size: 18px; margin: 6px 0 0 0;">Rapport d'activité détaillé</h2>
@@ -249,33 +247,53 @@ if(btnDownloadPdf) {
                     <tr style="background: #f8fafc;">
                         <th style="width: 15%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
                         <th style="width: 12%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
-                        <th style="width: 35%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
-                        <th style="width: 38%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
+                        <th style="width: 33%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
+                        <th style="width: 40%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${trs}
                 </tbody>
             </table>
-            
             <div style="margin-top: 30px; text-align: right; color: #94a3b8; font-size: 10px;">
                 Généré le ${new Date().toLocaleString('fr-FR')} par le système Zeïna.
             </div>
         </div>
         `;
 
-        // 1. On crée un élément physique attaché au document
+        // 1. ÉCRAN DE CHARGEMENT PLEIN ÉCRAN (Cache la bidouille à l'utilisateur)
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.style.position = 'fixed';
+        loadingOverlay.style.top = '0';
+        loadingOverlay.style.left = '0';
+        loadingOverlay.style.width = '100vw';
+        loadingOverlay.style.height = '100vh';
+        loadingOverlay.style.backgroundColor = '#0f172a';
+        loadingOverlay.style.zIndex = '99999'; // Par-dessus TOUT
+        loadingOverlay.style.display = 'flex';
+        loadingOverlay.style.flexDirection = 'column';
+        loadingOverlay.style.alignItems = 'center';
+        loadingOverlay.style.justifyContent = 'center';
+        loadingOverlay.innerHTML = `
+            <div style="text-align: center;">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size: 40px; color: #3b82f6; margin-bottom: 15px;"></i>
+                <h2 style="color: white; font-family: sans-serif; font-size: 18px; margin: 0;">Génération du PDF...</h2>
+                <p style="color: #94a3b8; font-family: sans-serif; font-size: 12px; margin-top: 5px;">Veuillez patienter quelques secondes.</p>
+            </div>
+        `;
+        document.body.appendChild(loadingOverlay);
+
+        // 2. LE DOCUMENT PDF RÉEL (En dessous de l'écran de chargement)
         const pdfWrapper = document.createElement('div');
         pdfWrapper.innerHTML = htmlString;
-
-        // 2. On le place tout en haut à gauche, derrière le fond d'écran sombre de l'appli !
         pdfWrapper.style.position = 'absolute';
         pdfWrapper.style.top = '0';
         pdfWrapper.style.left = '0';
-        pdfWrapper.style.width = '794px';
-        pdfWrapper.style.zIndex = '-10'; // Caché derrière ton application
+        pdfWrapper.style.width = '800px';
+        pdfWrapper.style.zIndex = '99998'; // Juste en dessous de l'écran de chargement
 
         document.body.appendChild(pdfWrapper);
+        window.scrollTo(0, 0); // Sécurité pour iOS
 
         const opt = {
             margin:       10,
@@ -285,20 +303,20 @@ if(btnDownloadPdf) {
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
         btn.disabled = true;
 
-        // 3. On capture cet élément qui est physiquement dans la page
+        // 3. CAPTURE ET NETTOYAGE
         html2pdf().set(opt).from(pdfWrapper).save().then(() => {
+            document.body.removeChild(pdfWrapper);
+            document.body.removeChild(loadingOverlay);
             btn.innerHTML = originalText;
             btn.disabled = false;
-            // 4. On nettoie l'élément caché une fois terminé
-            document.body.removeChild(pdfWrapper);
         }).catch(err => {
             console.error("Erreur PDF:", err);
+            document.body.removeChild(pdfWrapper);
+            document.body.removeChild(loadingOverlay);
             btn.innerHTML = originalText;
             btn.disabled = false;
-            document.body.removeChild(pdfWrapper);
             alert("Erreur lors de la création du PDF.");
         });
     });
