@@ -15,8 +15,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Version maintenue à 2.4 pour ne pas recréer de boucle.
-// Utilise le bouton "Vider le cache" des paramètres pour forcer l'actualisation !
 const APP_VERSION = "2.4";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
@@ -178,7 +176,7 @@ async function generateReport() {
 }
 
 // =========================================================================
-// MOTEUR PDF CORRIGÉ : FIXATION DES LARGEURS ET RETOURS À LA LIGNE
+// MOTEUR PDF CORRIGÉ : DIRECTEMENT VIA HTML STRING (Pas de page blanche)
 // =========================================================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
@@ -208,16 +206,15 @@ if(btnDownloadPdf) {
                         <td style="padding: 10px 5px; color: #475569;">${dateStr}</td>
                         <td style="padding: 10px 5px;">${getBadgeHtml(ev.type)}</td>
                         <td style="padding: 10px 5px; font-weight: bold; color: #1e293b;">${ev.titre}</td>
-                        <!-- word-break: break-word force l'email à aller à la ligne -->
                         <td style="padding: 10px 5px; color: #64748b; line-height: 1.4; word-break: break-word;">${ev.desc.replace(' | ', '<br>')}</td>
                     </tr>
                 `;
             }).join('');
         }
 
-        // Layout strictement défini à 760px avec table-layout: fixed
-        const htmlContent = `
-        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; width: 760px; background: white; margin: 0 auto;">
+        // Le code HTML généré à la volée (ne touche pas au DOM)
+        const htmlString = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; width: 760px; background: white; margin: 0 auto; padding: 10px;">
             
             <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 20px;">
                 <h1 style="color: #1e293b; font-size: 24px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
@@ -266,33 +263,26 @@ if(btnDownloadPdf) {
         </div>
         `;
 
-        // Élément inséré physiquement dans la page mais masqué proprement
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = htmlContent;
-        wrapper.style.position = 'absolute';
-        wrapper.style.top = '0';
-        wrapper.style.left = '0';
-        wrapper.style.width = '800px';
-        wrapper.style.zIndex = '-9999';
-        wrapper.style.opacity = '0';
-        wrapper.style.pointerEvents = 'none';
-        document.body.appendChild(wrapper);
-
         const opt = {
             margin:       [10, 10, 10, 10],
             filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 }, // Force le moteur à utiliser 800px de large quoi qu'il arrive
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
         btn.disabled = true;
 
-        html2pdf().set(opt).from(wrapper).save().then(() => {
+        // On passe directement le texte HTML (htmlString) au moteur PDF. 100% garanti anti-page blanche.
+        html2pdf().set(opt).from(htmlString).save().then(() => {
             btn.innerHTML = originalText;
             btn.disabled = false;
-            document.body.removeChild(wrapper);
+        }).catch(err => {
+            console.error("Erreur PDF:", err);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            alert("Une erreur est survenue lors de la création du PDF.");
         });
     });
 }
