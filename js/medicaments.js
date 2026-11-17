@@ -17,7 +17,7 @@ const db = getFirestore(app);
 
 // ==========================================
 // SYSTÈME DE MISE À JOUR FORCÉE
-const APP_VERSION = "2.1";
+const APP_VERSION = "2.2";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
@@ -38,7 +38,7 @@ let currentMedId = null;
 let currentMedLots = [];
 let scannedBarcodeValue = "";
 
-document.getElementById('logout-btn').addEventListener('click', () => {
+document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
 });
 

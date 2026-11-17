@@ -17,7 +17,7 @@ const db = getFirestore(app);
 
 // ==========================================
 // SYSTÈME DE MISE À JOUR FORCÉE
-const APP_VERSION = "2.1"; // ⚠️ Change ce numéro à chaque fois que tu mets à jour le site (ex: "2.1", "2.2")
+const APP_VERSION = "2.2"; // ⚠️ Change ce numéro à chaque fois que tu mets à jour le site (ex: "2.1", "2.2")
 
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     // 1. On vide la mémoire cache du téléphone pour forcer le nouveau code
@@ -44,7 +44,7 @@ let searchQuery = "";
 let currentItemId;
 let currentItemRef;
 
-document.getElementById('logout-btn').addEventListener('click', () => {
+document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
 });
 
