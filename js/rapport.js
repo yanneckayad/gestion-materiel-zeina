@@ -15,7 +15,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Version 2.4 - N'oublie pas de vider le cache depuis tes paramètres !
+// Version 2.4 maintenue. On utilise le bouton des Paramètres pour vider le cache !
 const APP_VERSION = "2.4";
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
     if ('caches' in window) {
@@ -177,7 +177,7 @@ async function generateReport() {
 }
 
 // =========================================================================
-// MOTEUR PDF CORRIGÉ : FIXATION ÉCRAN PC (800PX) POUR ÉVITER LA COUPURE
+// MOTEUR PDF DÉFINITIF : TECHNIQUE DU Z-INDEX POUR MOBILE
 // =========================================================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
@@ -189,10 +189,10 @@ if(btnDownloadPdf) {
         const endStr = document.getElementById('date-fin').value;
 
         function getBadgeHtml(type) {
-            if (type === 'pret') return `<span style="background:#eff6ff; color:#2563eb; padding: 5px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">PRÊT</span>`;
-            if (type === 'retour') return `<span style="background:#ecfdf5; color:#10b981; padding: 5px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">RETOUR</span>`;
-            if (type === 'don') return `<span style="background:#fffbeb; color:#d97706; padding: 5px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">DON</span>`;
-            if (type === 'ajout') return `<span style="background:#faf5ff; color:#9333ea; padding: 5px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;">STOCK</span>`;
+            if (type === 'pret') return `<span style="background:#eff6ff; color:#2563eb; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">PRÊT</span>`;
+            if (type === 'retour') return `<span style="background:#ecfdf5; color:#10b981; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">RETOUR</span>`;
+            if (type === 'don') return `<span style="background:#fffbeb; color:#d97706; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">DON</span>`;
+            if (type === 'ajout') return `<span style="background:#faf5ff; color:#9333ea; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">STOCK</span>`;
             return '';
         }
 
@@ -205,17 +205,17 @@ if(btnDownloadPdf) {
                 return `
                     <tr style="border-bottom: 1px solid #e2e8f0;">
                         <td style="width: 15%; padding: 12px 6px; color: #475569; vertical-align: top;">${dateStr}</td>
-                        <td style="width: 15%; padding: 12px 6px; vertical-align: top;">${getBadgeHtml(ev.type)}</td>
-                        <td style="width: 32%; padding: 12px 6px; font-weight: bold; color: #1e293b; vertical-align: top; overflow-wrap: break-word; word-break: break-word;">${ev.titre}</td>
-                        <td style="width: 38%; padding: 12px 6px; color: #64748b; line-height: 1.5; vertical-align: top; overflow-wrap: break-word; word-break: break-word;">${ev.desc.replace(' | ', '<br>')}</td>
+                        <td style="width: 12%; padding: 12px 6px; vertical-align: top;">${getBadgeHtml(ev.type)}</td>
+                        <td style="width: 35%; padding: 12px 6px; font-weight: bold; color: #1e293b; vertical-align: top; word-break: break-word; white-space: normal;">${ev.titre}</td>
+                        <td style="width: 38%; padding: 12px 6px; color: #64748b; line-height: 1.5; vertical-align: top; word-break: break-word; white-space: normal;">${ev.desc.replace(' | ', '<br>')}</td>
                     </tr>
                 `;
             }).join('');
         }
 
-        // Le wrapper a une largeur fixe stricte de 750px (Parfait pour le A4)
+        // Le container a une largeur STRICTE de 794px (Standard A4 à 96 DPI)
         const htmlString = `
-        <div style="width: 750px; background: white; padding: 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
+        <div id="pdf-export-layer" style="width: 794px; background: white; padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
             
             <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px;">
                 <h1 style="color: #1e293b; font-size: 26px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
@@ -248,8 +248,8 @@ if(btnDownloadPdf) {
                 <thead>
                     <tr style="background: #f8fafc;">
                         <th style="width: 15%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
-                        <th style="width: 15%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
-                        <th style="width: 32%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
+                        <th style="width: 12%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
+                        <th style="width: 35%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
                         <th style="width: 38%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
                     </tr>
                 </thead>
@@ -264,30 +264,42 @@ if(btnDownloadPdf) {
         </div>
         `;
 
-        // Élément HTML temporaire (détaché)
-        const tempContainer = document.createElement('div');
-        tempContainer.innerHTML = htmlString;
+        // 1. On crée un élément physique attaché au document
+        const pdfWrapper = document.createElement('div');
+        pdfWrapper.innerHTML = htmlString;
 
-        // Le SECRET : windowWidth force le téléphone à générer l'image PDF comme un écran d'ordinateur !
+        // 2. On le place tout en haut à gauche, derrière le fond d'écran sombre de l'appli !
+        pdfWrapper.style.position = 'absolute';
+        pdfWrapper.style.top = '0';
+        pdfWrapper.style.left = '0';
+        pdfWrapper.style.width = '794px';
+        pdfWrapper.style.zIndex = '-10'; // Caché derrière ton application
+
+        document.body.appendChild(pdfWrapper);
+
         const opt = {
             margin:       10,
             filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
+            image:        { type: 'jpeg', quality: 1.0 },
+            html2canvas:  { scale: 2, useCORS: true },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
         btn.disabled = true;
 
-        html2pdf().set(opt).from(tempContainer).save().then(() => {
+        // 3. On capture cet élément qui est physiquement dans la page
+        html2pdf().set(opt).from(pdfWrapper).save().then(() => {
             btn.innerHTML = originalText;
             btn.disabled = false;
+            // 4. On nettoie l'élément caché une fois terminé
+            document.body.removeChild(pdfWrapper);
         }).catch(err => {
             console.error("Erreur PDF:", err);
             btn.innerHTML = originalText;
             btn.disabled = false;
-            alert("Erreur PDF");
+            document.body.removeChild(pdfWrapper);
+            alert("Erreur lors de la création du PDF.");
         });
     });
 }
