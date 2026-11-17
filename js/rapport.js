@@ -176,7 +176,7 @@ async function generateReport() {
 }
 
 // =========================================================================
-// MOTEUR PDF CORRIGÉ : DIRECTEMENT VIA HTML STRING (Pas de page blanche)
+// MOTEUR PDF CORRIGÉ : RESPONSIVE A4 AVEC POURCENTAGES
 // =========================================================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
 if(btnDownloadPdf) {
@@ -203,53 +203,53 @@ if(btnDownloadPdf) {
                 const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
                 return `
                     <tr style="border-bottom: 1px solid #e2e8f0;">
-                        <td style="padding: 10px 5px; color: #475569;">${dateStr}</td>
-                        <td style="padding: 10px 5px;">${getBadgeHtml(ev.type)}</td>
-                        <td style="padding: 10px 5px; font-weight: bold; color: #1e293b;">${ev.titre}</td>
-                        <td style="padding: 10px 5px; color: #64748b; line-height: 1.4; word-break: break-word;">${ev.desc.replace(' | ', '<br>')}</td>
+                        <td style="padding: 10px 5px; color: #475569; vertical-align: top;">${dateStr}</td>
+                        <td style="padding: 10px 5px; vertical-align: top;">${getBadgeHtml(ev.type)}</td>
+                        <td style="padding: 10px 5px; font-weight: bold; color: #1e293b; vertical-align: top; word-break: break-word;">${ev.titre}</td>
+                        <td style="padding: 10px 5px; color: #64748b; line-height: 1.4; word-break: break-word; vertical-align: top;">${ev.desc.replace(' | ', '<br>')}</td>
                     </tr>
                 `;
             }).join('');
         }
 
-        // Le code HTML généré à la volée (ne touche pas au DOM)
+        // Utilisation de 100% au lieu de 760px
         const htmlString = `
-        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; width: 760px; background: white; margin: 0 auto; padding: 10px;">
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; background: white; width: 100%;">
             
             <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 20px;">
-                <h1 style="color: #1e293b; font-size: 24px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
+                <h1 style="color: #1e293b; font-size: 22px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
                 <h2 style="color: #64748b; font-size: 16px; margin: 5px 0 0 0;">Rapport d'activité détaillé</h2>
-                <p style="color: #94a3b8; font-size: 13px; margin: 5px 0 0 0;">Période du <strong>${startStr}</strong> au <strong>${endStr}</strong></p>
+                <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Période du <strong>${startStr}</strong> au <strong>${endStr}</strong></p>
             </div>
 
-            <div style="display: flex; gap: 10px; margin-bottom: 25px; width: 100%;">
-                <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 20px; color: #2563eb;">${currentStats.prets}</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 10px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts</p>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; width: 100%;">
+                <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 10px; border-radius: 6px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 18px; color: #2563eb;">${currentStats.prets}</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 9px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts</p>
                 </div>
-                <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 12px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 20px; color: #10b981;">${currentStats.retours}</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 10px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours</p>
+                <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 10px; border-radius: 6px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 18px; color: #10b981;">${currentStats.retours}</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 9px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours</p>
                 </div>
-                <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 20px; color: #d97706;">${currentStats.dons}</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 10px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons</p>
+                <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 6px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 18px; color: #d97706;">${currentStats.dons}</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 9px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons</p>
                 </div>
-                <div style="flex: 1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 12px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 20px; color: #9333ea;">${currentStats.ajouts}</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 10px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu</p>
+                <div style="flex: 1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 10px; border-radius: 6px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 18px; color: #9333ea;">${currentStats.ajouts}</h3>
+                    <p style="margin: 4px 0 0 0; font-size: 9px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu</p>
                 </div>
             </div>
 
-            <h3 style="font-size: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; color: #0f172a;">Journal des opérations</h3>
+            <h3 style="font-size: 14px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; color: #0f172a;">Journal des opérations</h3>
             
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; table-layout: fixed;">
                 <thead>
                     <tr style="background: #f8fafc;">
                         <th style="width: 15%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
                         <th style="width: 12%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
-                        <th style="width: 35%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
-                        <th style="width: 38%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
+                        <th style="width: 38%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
+                        <th style="width: 35%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -263,18 +263,18 @@ if(btnDownloadPdf) {
         </div>
         `;
 
+        // Les options nettoyées, sans dimensions fixes qui perturbent le rendu
         const opt = {
-            margin:       [10, 10, 10, 10],
+            margin:       10,
             filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
+            html2canvas:  { scale: 2, useCORS: true },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
         btn.disabled = true;
 
-        // On passe directement le texte HTML (htmlString) au moteur PDF. 100% garanti anti-page blanche.
         html2pdf().set(opt).from(htmlString).save().then(() => {
             btn.innerHTML = originalText;
             btn.disabled = false;
@@ -282,7 +282,7 @@ if(btnDownloadPdf) {
             console.error("Erreur PDF:", err);
             btn.innerHTML = originalText;
             btn.disabled = false;
-            alert("Une erreur est survenue lors de la création du PDF.");
+            alert("Erreur PDF");
         });
     });
 }
