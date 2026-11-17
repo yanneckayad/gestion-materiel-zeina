@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -16,17 +16,14 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // ==========================================
-// SYSTÈME DE MISE À JOUR FORCÉE
-const APP_VERSION = "2.1"; // ⚠️ Change ce numéro à chaque fois que tu mets à jour le site (ex: "2.1", "2.2")
+// SYSTÈME DE MISE À JOUR FORCÉE (VERSION UNIFIÉE)
+const APP_VERSION = "2.4";
 
 if (localStorage.getItem("zeina_version") !== APP_VERSION) {
-    // 1. On vide la mémoire cache du téléphone pour forcer le nouveau code
     if ('caches' in window) {
         caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
-    // 2. On mémorise la nouvelle version
     localStorage.setItem("zeina_version", APP_VERSION);
-    // 3. On force la déconnexion et on renvoie à l'accueil
     signOut(auth).then(() => {
         window.location.replace("index.html");
     });
