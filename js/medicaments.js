@@ -20,6 +20,7 @@ onAuthStateChanged(auth, (user) => {
 });
 
 let allMeds = [];
+let allPatients = [];
 let searchQuery = "";
 let currentFilter = "all";
 let currentMedId = null;
@@ -30,6 +31,42 @@ document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
 });
 
+// ==========================================
+// GESTION DES ONGLETS (STOCK / PATIENTS)
+// ==========================================
+const tabStock = document.getElementById('tab-stock');
+const tabPatients = document.getElementById('tab-patients');
+const viewStock = document.getElementById('view-stock');
+const viewPatients = document.getElementById('view-patients');
+
+function switchTab(tab) {
+    if (tab === 'stock') {
+        viewStock.classList.remove('hidden');
+        viewPatients.classList.add('hidden');
+
+        tabStock.classList.add('bg-blue-600', 'text-white', 'shadow-lg', 'shadow-blue-500/20');
+        tabStock.classList.remove('text-slate-400', 'hover:text-white');
+
+        tabPatients.classList.remove('bg-rose-600', 'text-white', 'shadow-lg', 'shadow-rose-500/20');
+        tabPatients.classList.add('text-slate-400', 'hover:text-white');
+    } else {
+        viewPatients.classList.remove('hidden');
+        viewStock.classList.add('hidden');
+
+        tabPatients.classList.add('bg-rose-600', 'text-white', 'shadow-lg', 'shadow-rose-500/20');
+        tabPatients.classList.remove('text-slate-400', 'hover:text-white');
+
+        tabStock.classList.remove('bg-blue-600', 'text-white', 'shadow-lg', 'shadow-blue-500/20');
+        tabStock.classList.add('text-slate-400', 'hover:text-white');
+    }
+}
+
+tabStock.addEventListener('click', () => switchTab('stock'));
+tabPatients.addEventListener('click', () => switchTab('patients'));
+
+// ==========================================
+// GESTION DU STOCK PHARMACIE
+// ==========================================
 document.getElementById('search-med').addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase();
     renderMeds();
@@ -165,7 +202,8 @@ async function verifierCodeBarre(code) {
             const qte = extractLots(medData).qteTotale;
             alert(`Médicament reconnu : "${medData.nom}" (Stock : ${qte} boîtes)`);
         } else {
-            document.getElementById('scanned-code-display').textContent = `Code-barres scanné : ${code}`;
+            const codeDisplay = document.getElementById('scanned-code-display');
+            if (codeDisplay) codeDisplay.textContent = `Code-barres scanné : ${code}`;
             document.getElementById('scanned-med-name').value = "";
             document.getElementById('scanned-med-stock').value = 1;
             document.getElementById('scanned-med-exp').value = "";
@@ -308,8 +346,8 @@ function renderMeds() {
 
     document.querySelectorAll('.btn-give').forEach(button => {
         button.addEventListener('click', async (e) => {
-            currentMedId = e.target.getAttribute('data-id');
-            const nom = e.target.getAttribute('data-nom');
+            currentMedId = e.currentTarget.getAttribute('data-id');
+            const nom = e.currentTarget.getAttribute('data-nom');
 
             const medDoc = await getDoc(doc(db, "medicaments", currentMedId));
             const { lots, qteTotale } = extractLots(medDoc.data());
@@ -319,8 +357,9 @@ function renderMeds() {
                 return alert("Ce médicament est en rupture totale de stock.");
             }
 
-            document.getElementById('give-med-name').textContent = nom;
-            document.getElementById('give-med-stock-info').textContent = `Total disponible : ${qteTotale} boîte(s)`;
+            document.getElementById('give-med-name').textContent = `${nom} (${qteTotale} dispo)`;
+            const stockInfoEl = document.getElementById('give-med-stock-info');
+            if (stockInfoEl) stockInfoEl.textContent = `Total disponible : ${qteTotale} boîte(s)`;
             document.getElementById('give-quantity').value = 1;
             document.getElementById('give-beneficiary').value = "";
 
@@ -330,7 +369,7 @@ function renderMeds() {
                 const opt = document.createElement('option');
                 opt.value = lot.dateExpiration;
                 let text = `Lot Exp: ${lot.dateExpiration} (${lot.quantite} dispo)`;
-                if(index === 0) text = "🔴 URGENT: " + text;
+                if (index === 0) text = "🔴 URGENT: " + text;
                 opt.textContent = text;
                 lotSelect.appendChild(opt);
             });
@@ -341,8 +380,8 @@ function renderMeds() {
 
     document.querySelectorAll('.btn-restock').forEach(button => {
         button.addEventListener('click', (e) => {
-            currentMedId = e.target.getAttribute('data-id');
-            document.getElementById('restock-med-name').textContent = e.target.getAttribute('data-nom');
+            currentMedId = e.currentTarget.getAttribute('data-id');
+            document.getElementById('restock-med-name').textContent = e.currentTarget.getAttribute('data-nom');
             document.getElementById('restock-quantity').value = 1;
             document.getElementById('restock-exp').value = "";
             document.getElementById('restock-modal').classList.remove('hidden');
@@ -439,10 +478,158 @@ window.deleteMed = async function(id) {
     }
 };
 
+// ==========================================
+// GESTION DES PATIENTS PRIORITAIRES
+// ==========================================
+const patientModal = document.getElementById('patient-modal');
+const patientForm = document.getElementById('patient-form');
+const patientsListEl = document.getElementById('patients-list');
+
+document.getElementById('btn-add-patient').addEventListener('click', () => {
+    patientForm.reset();
+    patientModal.classList.remove('hidden');
+});
+
+document.getElementById('close-patient-modal').addEventListener('click', () => patientModal.classList.add('hidden'));
+document.getElementById('cancel-patient-btn').addEventListener('click', () => patientModal.classList.add('hidden'));
+
+patientForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nom = document.getElementById('patient-name').value.trim();
+    const medicament = document.getElementById('patient-med').value.trim();
+    const quantite = parseInt(document.getElementById('patient-qty').value);
+    const type = document.getElementById('patient-duration').value;
+
+    const submitBtn = patientForm.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enregistrement...';
+    submitBtn.disabled = true;
+
+    try {
+        await addDoc(collection(db, "patients_prioritaires"), {
+            nom,
+            medicament,
+            quantite,
+            type,
+            ajoutePar: auth.currentUser ? auth.currentUser.email : "Inconnu",
+            dateAjout: new Date()
+        });
+        patientForm.reset();
+        patientModal.classList.add('hidden');
+    } catch (error) {
+        alert("Erreur lors de l'enregistrement du patient : " + error.message);
+    } finally {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+});
+
+function renderPatients() {
+    patientsListEl.innerHTML = "";
+
+    if (allPatients.length === 0) {
+        patientsListEl.innerHTML = `
+            <div class="col-span-full text-center py-12 text-slate-500 animate-fade-in">
+                <i class="fa-solid fa-heart-pulse text-4xl mb-3 opacity-50 text-rose-500/60"></i>
+                <p>Aucun patient prioritaire enregistré pour le moment.</p>
+            </div>
+        `;
+        return;
+    }
+
+    allPatients.forEach((item, index) => {
+        const data = item.data;
+        const id = item.id;
+        const isUrgent = data.type && data.type.toLowerCase().includes('urgent');
+
+        // Vérification en direct si le médicament existe dans le stock
+        const searchKey = (data.medicament || "").toLowerCase();
+        const matchingMeds = allMeds.filter(m => m.data.nom.toLowerCase().includes(searchKey));
+        const availableStock = matchingMeds.reduce((sum, m) => sum + extractLots(m.data).qteTotale, 0);
+
+        const stockBadge = availableStock > 0
+            ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i class="fa-solid fa-check"></i> En stock (${availableStock})</span>`
+            : `<span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20"><i class="fa-solid fa-triangle-exclamation"></i> Rupture / Absent</span>`;
+
+        const typeBadge = isUrgent
+            ? `<span class="px-2.5 py-1 text-[11px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20"><i class="fa-solid fa-bolt mr-1"></i>Urgent</span>`
+            : `<span class="px-2.5 py-1 text-[11px] font-bold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20"><i class="fa-solid fa-repeat mr-1"></i>Chronique</span>`;
+
+        const card = document.createElement('div');
+        card.className = "animate-slide-up bg-slate-900/50 p-5 rounded-2xl border border-slate-700/60 hover:border-rose-500/40 transition-all duration-300 flex flex-col justify-between gap-4 shadow-lg";
+        card.style.animationDelay = `${index * 60}ms`;
+
+        card.innerHTML = `
+            <div class="space-y-3">
+                <div class="flex justify-between items-start gap-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-white text-base leading-tight">${data.nom}</h3>
+                            <div class="mt-1">${typeBadge}</div>
+                        </div>
+                    </div>
+                    <button onclick="deletePatient('${id}')" class="w-8 h-8 active:scale-90 bg-slate-800 hover:bg-red-600/20 text-slate-400 hover:text-red-400 border border-slate-700 rounded-lg transition-all flex items-center justify-center" title="Supprimer">
+                        <i class="fa-solid fa-trash text-xs"></i>
+                    </button>
+                </div>
+
+                <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50 space-y-1.5">
+                    <p class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Médicament requis</p>
+                    <p class="text-white font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-pills text-rose-400"></i> ${data.medicament}
+                    </p>
+                    <p class="text-xs text-slate-300">Quantité : <strong class="text-white">${data.quantite} boîte(s) / mois</strong></p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-800">
+                ${stockBadge}
+                <button class="btn-find-med active:scale-95 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5" data-med="${data.medicament}">
+                    <i class="fa-solid fa-magnifying-glass pointer-events-none"></i> Voir stock
+                </button>
+            </div>
+        `;
+        patientsListEl.appendChild(card);
+    });
+
+    document.querySelectorAll('.btn-find-med').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const medName = e.currentTarget.getAttribute('data-med');
+            document.getElementById('search-med').value = medName;
+            searchQuery = medName.toLowerCase();
+            currentFilter = "all";
+            updateFilterUI(btnAll);
+            renderMeds();
+            switchTab('stock');
+        });
+    });
+}
+
+window.deletePatient = async function(id) {
+    if (confirm("Supprimer ce patient de la liste prioritaire ?")) {
+        await deleteDoc(doc(db, "patients_prioritaires", id));
+    }
+};
+
+// ==========================================
+// ÉCOUTE TEMPS RÉEL FIRESTORE
+// ==========================================
 onSnapshot(collection(db, "medicaments"), (snapshot) => {
     allMeds = [];
     snapshot.forEach((doc) => {
         allMeds.push({ id: doc.id, data: doc.data() });
     });
     renderMeds();
+    renderPatients();
+});
+
+onSnapshot(collection(db, "patients_prioritaires"), (snapshot) => {
+    allPatients = [];
+    snapshot.forEach((doc) => {
+        allPatients.push({ id: doc.id, data: doc.data() });
+    });
+    renderPatients();
 });
