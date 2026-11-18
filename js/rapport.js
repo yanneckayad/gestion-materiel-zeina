@@ -19,7 +19,7 @@ onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
 });
 
-document.getElementById('logout-sidebar-btn').addEventListener('click', () => {
+document.getElementById('logout-sidebar-btn')?.addEventListener('click', () => {
     signOut(auth).then(() => window.location.href = "index.html");
 });
 
@@ -67,6 +67,7 @@ async function generateReport() {
         const pretsSnap = await getDocs(collection(db, "prets"));
         pretsSnap.forEach(doc => {
             const data = doc.data();
+            if (!data.datePret) return;
             const eventDate = data.datePret.toDate();
             if (eventDate >= startDate && eventDate <= endDate) {
                 currentStats.prets++;
@@ -82,6 +83,7 @@ async function generateReport() {
         const retoursSnap = await getDocs(collection(db, "retours"));
         retoursSnap.forEach(doc => {
             const data = doc.data();
+            if (!data.dateRetour) return;
             const eventDate = data.dateRetour.toDate();
             if (eventDate >= startDate && eventDate <= endDate) {
                 currentStats.retours++;
@@ -97,6 +99,7 @@ async function generateReport() {
         const medHistSnap = await getDocs(collection(db, "historique_medicaments"));
         medHistSnap.forEach(doc => {
             const data = doc.data();
+            if (!data.date) return;
             const eventDate = data.date.toDate();
             if (eventDate >= startDate && eventDate <= endDate) {
                 const medName = medMap[data.medicamentId] || 'Médicament supprimé';
@@ -166,9 +169,17 @@ async function generateReport() {
     }
 }
 
+// ==========================================
+// TÉLÉCHARGEMENT PDF (html2pdf sans toucher au fond de la page)
+// ==========================================
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
-if(btnDownloadPdf) {
+if (btnDownloadPdf) {
     btnDownloadPdf.addEventListener('click', () => {
+        if (typeof html2pdf === 'undefined') {
+            alert("La bibliothèque html2pdf n'est pas chargée dans rapport.html.");
+            return;
+        }
+
         const btn = document.getElementById('btn-download-pdf');
         const originalText = btn.innerHTML;
 
@@ -176,10 +187,10 @@ if(btnDownloadPdf) {
         const endStr = document.getElementById('date-fin').value;
 
         function getBadgeHtml(type) {
-            if (type === 'pret') return `<span style="background:#eff6ff; color:#2563eb; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">PRÊT</span>`;
-            if (type === 'retour') return `<span style="background:#ecfdf5; color:#10b981; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">RETOUR</span>`;
-            if (type === 'don') return `<span style="background:#fffbeb; color:#d97706; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">DON</span>`;
-            if (type === 'ajout') return `<span style="background:#faf5ff; color:#9333ea; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">STOCK</span>`;
+            if (type === 'pret') return `<span style="background:#eff6ff; color:#2563eb; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 10px;">PRÊT</span>`;
+            if (type === 'retour') return `<span style="background:#ecfdf5; color:#10b981; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 10px;">RETOUR</span>`;
+            if (type === 'don') return `<span style="background:#fffbeb; color:#d97706; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 10px;">DON</span>`;
+            if (type === 'ajout') return `<span style="background:#faf5ff; color:#9333ea; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 10px;">STOCK</span>`;
             return '';
         }
 
@@ -190,99 +201,107 @@ if(btnDownloadPdf) {
             trs = currentAllEvents.map(ev => {
                 const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
                 return `
-                    <tr style="border-bottom: 1px solid #e2e8f0;">
-                        <td style="width: 15%; padding: 12px 6px; color: #475569; vertical-align: top;">${dateStr}</td>
-                        <td style="width: 12%; padding: 12px 6px; vertical-align: top;">${getBadgeHtml(ev.type)}</td>
-                        <td style="width: 35%; padding: 12px 6px; font-weight: bold; color: #1e293b; vertical-align: top; word-break: break-word; white-space: normal;">${ev.titre}</td>
-                        <td style="width: 38%; padding: 12px 6px; color: #64748b; line-height: 1.5; vertical-align: top; word-break: break-word; white-space: normal;">${ev.desc.replace(' | ', '<br>')}</td>
+                    <tr style="border-bottom: 1px solid #e2e8f0; page-break-inside: avoid;">
+                        <td style="width: 17%; padding: 8px 5px; color: #475569; vertical-align: top;">${dateStr}</td>
+                        <td style="width: 13%; padding: 8px 5px; vertical-align: top;">${getBadgeHtml(ev.type)}</td>
+                        <td style="width: 34%; padding: 8px 5px; font-weight: bold; color: #1e293b; vertical-align: top; word-break: break-word;">${ev.titre}</td>
+                        <td style="width: 36%; padding: 8px 5px; color: #64748b; line-height: 1.4; vertical-align: top; word-break: break-word;">${ev.desc.replace(' | ', '<br>')}</td>
                     </tr>
                 `;
             }).join('');
         }
 
         const htmlString = `
-        <div id="pdf-export-layer" style="width: 794px; background: white; padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
-            
-            <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px;">
-                <h1 style="color: #1e293b; font-size: 26px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
-                <h2 style="color: #64748b; font-size: 18px; margin: 6px 0 0 0;">Rapport d'activité détaillé</h2>
-                <p style="color: #94a3b8; font-size: 14px; margin: 6px 0 0 0;">Période du <strong>${startStr}</strong> au <strong>${endStr}</strong></p>
+        <div style="width: 700px; background: #ffffff; padding: 15px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; box-sizing: border-box;">
+            <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-bottom: 18px;">
+                <h1 style="color: #1e293b; font-size: 22px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
+                <h2 style="color: #64748b; font-size: 15px; margin: 4px 0 0 0; font-weight: normal;">Rapport d'activité détaillé</h2>
+                <p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0 0;">Période du <strong>${startStr}</strong> au <strong>${endStr}</strong></p>
             </div>
 
-            <div style="display: flex; justify-content: space-between; gap: 15px; margin-bottom: 30px; width: 100%;">
-                <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 24px; color: #2563eb;">${currentStats.prets}</h3>
-                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts</p>
-                </div>
-                <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 15px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 24px; color: #10b981;">${currentStats.retours}</h3>
-                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours</p>
-                </div>
-                <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 15px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 24px; color: #d97706;">${currentStats.dons}</h3>
-                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons</p>
-                </div>
-                <div style="flex: 1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 15px; border-radius: 8px; text-align: center;">
-                    <h3 style="margin: 0; font-size: 24px; color: #9333ea;">${currentStats.ajouts}</h3>
-                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu</p>
-                </div>
-            </div>
+            <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 0 -8px 20px -8px;">
+                <tr>
+                    <td style="width: 25%; background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px 6px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: bold; color: #2563eb;">${currentStats.prets}</div>
+                        <div style="margin-top: 4px; font-size: 9px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts</div>
+                    </td>
+                    <td style="width: 25%; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 12px 6px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: bold; color: #10b981;">${currentStats.retours}</div>
+                        <div style="margin-top: 4px; font-size: 9px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours</div>
+                    </td>
+                    <td style="width: 25%; background: #fffbeb; border: 1px solid #fde68a; padding: 12px 6px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: bold; color: #d97706;">${currentStats.dons}</div>
+                        <div style="margin-top: 4px; font-size: 9px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons</div>
+                    </td>
+                    <td style="width: 25%; background: #faf5ff; border: 1px solid #e9d5ff; padding: 12px 6px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: bold; color: #9333ea;">${currentStats.ajouts}</div>
+                        <div style="margin-top: 4px; font-size: 9px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu</div>
+                    </td>
+                </tr>
+            </table>
 
-            <h3 style="font-size: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; color: #0f172a;">Journal des opérations</h3>
-            
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; table-layout: fixed;">
+            <h3 style="font-size: 14px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin: 0 0 10px 0; color: #0f172a;">Journal des opérations</h3>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed;">
                 <thead>
                     <tr style="background: #f8fafc;">
-                        <th style="width: 15%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
-                        <th style="width: 12%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
-                        <th style="width: 35%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
-                        <th style="width: 38%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
+                        <th style="width: 17%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
+                        <th style="width: 13%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
+                        <th style="width: 34%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
+                        <th style="width: 36%; padding: 8px 5px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${trs}
                 </tbody>
             </table>
-            
-            <div style="margin-top: 30px; text-align: right; color: #94a3b8; font-size: 10px;">
+
+            <div style="margin-top: 20px; text-align: right; color: #94a3b8; font-size: 9px;">
                 Généré le ${new Date().toLocaleString('fr-FR')} par le système Zeïna.
             </div>
         </div>
         `;
 
-        const pdfWrapper = document.createElement('div');
-        pdfWrapper.innerHTML = htmlString;
-        pdfWrapper.style.position = 'absolute';
-        pdfWrapper.style.top = '0';
-        pdfWrapper.style.left = '0';
-        pdfWrapper.style.width = '794px';
-        pdfWrapper.style.zIndex = '-10';
-
-        document.body.appendChild(pdfWrapper);
-
         const opt = {
             margin:       10,
             filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
-            image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true },
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
         btn.disabled = true;
 
-        html2pdf().set(opt).from(pdfWrapper).save().then(() => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            document.body.removeChild(pdfWrapper);
-        }).catch(err => {
+        try {
+            html2pdf().set(opt).from(htmlString).save().then(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }).catch(err => {
+                console.error("Erreur PDF:", err);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                alert("Erreur lors de la création du PDF : " + (err.message || err));
+            });
+        } catch (err) {
             console.error("Erreur PDF:", err);
             btn.innerHTML = originalText;
             btn.disabled = false;
-            document.body.removeChild(pdfWrapper);
-            alert("Erreur lors de la création du PDF.");
-        });
+            alert("Erreur lors de la création du PDF : " + (err.message || err));
+        }
     });
+}
+
+// ==========================================
+// BOUTON IMPRIMER
+// ==========================================
+const btnPrint = document.getElementById('btn-print')
+    || document.getElementById('print-btn')
+    || document.getElementById('btn-imprimer')
+    || Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('imprimer'));
+
+if (btnPrint && !btnPrint.getAttribute('onclick')) {
+    btnPrint.addEventListener('click', () => window.print());
 }
 
 generateReport();
