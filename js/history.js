@@ -16,17 +16,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // ==========================================
-// SYSTÈME DE MISE À JOUR FORCÉE (VERSION UNIFIÉE)
-const APP_VERSION = "2.4";
-
-if (localStorage.getItem("zeina_version") !== APP_VERSION) {
-    if ('caches' in window) {
-        caches.keys().then(names => names.forEach(name => caches.delete(name)));
-    }
-    localStorage.setItem("zeina_version", APP_VERSION);
-    signOut(auth).then(() => { window.location.replace("index.html"); });
-}
-// ==========================================
 
 // Sécurité : Redirection si non connecté
 onAuthStateChanged(auth, (user) => {

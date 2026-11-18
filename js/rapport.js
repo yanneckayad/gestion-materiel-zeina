@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyA5RLJI5ahBhZKGQNLXCFWIEnRxx0MNN44",
@@ -14,16 +14,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// Version 3.1
-const APP_VERSION = "3.1";
-if (localStorage.getItem("zeina_version") !== APP_VERSION) {
-    if ('caches' in window) {
-        caches.keys().then(names => names.forEach(name => caches.delete(name)));
-    }
-    localStorage.setItem("zeina_version", APP_VERSION);
-    console.log("Mise à jour silencieuse vers la version " + APP_VERSION);
-}
 
 onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
@@ -47,27 +37,22 @@ document.getElementById('report-form').addEventListener('submit', async (e) => {
 
 let currentAllEvents = [];
 let currentStats = { prets: 0, retours: 0, dons: 0, ajouts: 0 };
-let isGenerating = false;
 
 async function generateReport() {
-    if (isGenerating) return;
-    isGenerating = true;
+    const startInput = document.getElementById('date-debut').value;
+    const endInput = document.getElementById('date-fin').value;
+
+    const startDate = new Date(startInput);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(endInput);
+    endDate.setHours(23, 59, 59, 999);
 
     const submitBtn = document.querySelector('#report-form button');
-    const pdfBtn = document.getElementById('btn-download-pdf');
-    const printBtn = document.getElementById('btn-print');
-
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyse...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calcul...';
     submitBtn.disabled = true;
-    if(pdfBtn) pdfBtn.disabled = true;
-    if(printBtn) printBtn.disabled = true;
 
     try {
-        const startDate = new Date(document.getElementById('date-debut').value);
-        startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(document.getElementById('date-fin').value);
-        endDate.setHours(23, 59, 59, 999);
-
         const materielMap = {};
         const materielSnap = await getDocs(collection(db, "materiel"));
         materielSnap.forEach(doc => materielMap[doc.id] = doc.data().nom);
@@ -79,53 +64,59 @@ async function generateReport() {
         currentAllEvents = [];
         currentStats = { prets: 0, retours: 0, dons: 0, ajouts: 0 };
 
-        const qPrets = query(collection(db, "prets"), where("datePret", ">=", startDate), where("datePret", "<=", endDate));
-        const pretsSnap = await getDocs(qPrets);
+        const pretsSnap = await getDocs(collection(db, "prets"));
         pretsSnap.forEach(doc => {
             const data = doc.data();
-            currentStats.prets++;
-            currentAllEvents.push({
-                date: data.datePret.toDate(), category: 'materiel', itemId: data.materielId, type: 'Prêt',
-                titre: `Prêt : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
-                desc: `Au patient : ${data.patientNom} | Par : ${data.membreEmail}`,
-                icon: 'fa-hand-holding-heart', color: 'text-blue-400', bg: 'bg-blue-900'
-            });
+            const eventDate = data.datePret.toDate();
+            if (eventDate >= startDate && eventDate <= endDate) {
+                currentStats.prets++;
+                currentAllEvents.push({
+                    date: eventDate, category: 'materiel', itemId: data.materielId, type: 'pret',
+                    titre: `Prêt : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
+                    desc: `Au patient : ${data.patientNom} | Par : ${data.membreEmail}`,
+                    icon: 'fa-hand-holding-heart', color: 'text-blue-400', bg: 'bg-blue-900'
+                });
+            }
         });
 
-        const qRetours = query(collection(db, "retours"), where("dateRetour", ">=", startDate), where("dateRetour", "<=", endDate));
-        const retoursSnap = await getDocs(qRetours);
+        const retoursSnap = await getDocs(collection(db, "retours"));
         retoursSnap.forEach(doc => {
             const data = doc.data();
-            currentStats.retours++;
-            currentAllEvents.push({
-                date: data.dateRetour.toDate(), category: 'materiel', itemId: data.materielId, type: 'Retour',
-                titre: `Retour : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
-                desc: `Validé par : ${data.membreEmail}`,
-                icon: 'fa-boxes-packing', color: 'text-emerald-400', bg: 'bg-emerald-900'
-            });
+            const eventDate = data.dateRetour.toDate();
+            if (eventDate >= startDate && eventDate <= endDate) {
+                currentStats.retours++;
+                currentAllEvents.push({
+                    date: eventDate, category: 'materiel', itemId: data.materielId, type: 'retour',
+                    titre: `Retour : ${materielMap[data.materielId] || 'Matériel inconnu'}`,
+                    desc: `Validé par : ${data.membreEmail}`,
+                    icon: 'fa-boxes-packing', color: 'text-emerald-400', bg: 'bg-emerald-900'
+                });
+            }
         });
 
-        const qMeds = query(collection(db, "historique_medicaments"), where("date", ">=", startDate), where("date", "<=", endDate));
-        const medHistSnap = await getDocs(qMeds);
+        const medHistSnap = await getDocs(collection(db, "historique_medicaments"));
         medHistSnap.forEach(doc => {
             const data = doc.data();
-            const medName = medMap[data.medicamentId] || 'Médicament supprimé';
-            if (data.type === "distribution") {
-                currentStats.dons += data.quantite;
-                currentAllEvents.push({
-                    date: data.date.toDate(), category: 'medicament', itemId: data.medicamentId, type: 'Don',
-                    titre: `Don : ${medName} (-${data.quantite} boîte(s))`,
-                    desc: `Au patient : ${data.beneficiaire} | Par : ${data.membreEmail}`,
-                    icon: 'fa-pills', color: 'text-amber-400', bg: 'bg-amber-900'
-                });
-            } else if (data.type === "ajout_stock") {
-                currentStats.ajouts += data.quantite;
-                currentAllEvents.push({
-                    date: data.date.toDate(), category: 'medicament', itemId: data.medicamentId, type: 'Stock',
-                    titre: `Ajout Stock : ${medName} (+${data.quantite} boîte(s))`,
-                    desc: `Réceptionné par : ${data.membreEmail}`,
-                    icon: 'fa-boxes-stacked', color: 'text-purple-400', bg: 'bg-purple-900'
-                });
+            const eventDate = data.date.toDate();
+            if (eventDate >= startDate && eventDate <= endDate) {
+                const medName = medMap[data.medicamentId] || 'Médicament supprimé';
+                if (data.type === "distribution") {
+                    currentStats.dons += data.quantite;
+                    currentAllEvents.push({
+                        date: eventDate, category: 'medicament', itemId: data.medicamentId, type: 'don',
+                        titre: `Don : ${medName} (-${data.quantite} boîte(s))`,
+                        desc: `Au patient : ${data.beneficiaire} | Par : ${data.membreEmail}`,
+                        icon: 'fa-pills', color: 'text-amber-400', bg: 'bg-amber-900'
+                    });
+                } else if (data.type === "ajout_stock") {
+                    currentStats.ajouts += data.quantite;
+                    currentAllEvents.push({
+                        date: eventDate, category: 'medicament', itemId: data.medicamentId, type: 'ajout',
+                        titre: `Ajout Stock : ${medName} (+${data.quantite} boîte(s))`,
+                        desc: `Réceptionné par : ${data.membreEmail}`,
+                        icon: 'fa-boxes-stacked', color: 'text-purple-400', bg: 'bg-purple-900'
+                    });
+                }
             }
         });
 
@@ -168,111 +159,129 @@ async function generateReport() {
         }
 
     } catch (error) {
-        alert("Erreur lors de l'analyse : " + error.message);
+        alert("Erreur lors de la génération : " + error.message);
     } finally {
-        isGenerating = false;
         submitBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Analyser';
         submitBtn.disabled = false;
-        if(pdfBtn) pdfBtn.disabled = false;
-        if(printBtn) printBtn.disabled = false;
     }
 }
 
-
-// =========================================================================
-// MOTEUR PDF CENTRALISÉ (Pour le Téléchargement ET l'Impression)
-// =========================================================================
-function buildPdfDocument() {
-    if (!window.jspdf) {
-        alert("Erreur : La librairie PDF n'est pas chargée.");
-        return null;
-    }
-
-    const startStr = document.getElementById('date-debut').value;
-    const endStr = document.getElementById('date-fin').value;
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    doc.setFontSize(22);
-    doc.setTextColor(37, 99, 235);
-    doc.text("La Lumiere de l'Ange Zeina", 14, 20);
-
-    doc.setFontSize(14);
-    doc.setTextColor(71, 85, 105);
-    doc.text("Rapport d'activite detaille", 14, 28);
-
-    doc.setFontSize(10);
-    doc.setTextColor(148, 163, 184);
-    doc.text(`Periode du ${startStr} au ${endStr}`, 14, 34);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.line(14, 38, 196, 38);
-
-    doc.setFontSize(11);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`Prets : ${currentStats.prets}  |  Retours : ${currentStats.retours}  |  Dons : ${currentStats.dons}  |  Stock : ${currentStats.ajouts}`, 14, 46);
-
-    const tableData = currentAllEvents.map(ev => {
-        const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        return [
-            dateStr,
-            ev.type.toUpperCase(),
-            ev.titre,
-            ev.desc.replace(' | ', '\n')
-        ];
-    });
-
-    if (tableData.length === 0) {
-        tableData.push(["-", "-", "Aucune operation", "-"]);
-    }
-
-    doc.autoTable({
-        startY: 52,
-        head: [['Date', 'Action', 'Objet', 'Details']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
-        styles: { fontSize: 9, cellPadding: 4, textColor: [51, 65, 85] },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        columnStyles: {
-            0: { cellWidth: 28, fontStyle: 'bold' },
-            1: { cellWidth: 22, fontStyle: 'bold', textColor: [37, 99, 235] },
-            2: { cellWidth: 65, fontStyle: 'bold', textColor: [15, 23, 42] },
-            3: { cellWidth: 'auto' }
-        },
-        didDrawPage: function (data) {
-            doc.setFontSize(8);
-            doc.setTextColor(148, 163, 184);
-            doc.text('Genere le ' + new Date().toLocaleString('fr-FR') + ' par l\'application Zeina', data.settings.margin.left, doc.internal.pageSize.height - 10);
-        }
-    });
-
-    return { doc, startStr, endStr };
-}
-
-// Action 1 : Télécharger
 const btnDownloadPdf = document.getElementById('btn-download-pdf');
-if (btnDownloadPdf) {
+if(btnDownloadPdf) {
     btnDownloadPdf.addEventListener('click', () => {
-        const result = buildPdfDocument();
-        if (result) {
-            result.doc.save(`Zeina_Rapport_${result.startStr}_au_${result.endStr}.pdf`);
-        }
-    });
-}
+        const btn = document.getElementById('btn-download-pdf');
+        const originalText = btn.innerHTML;
 
-// Action 2 : Imprimer instantanément (Remplace le bug du navigateur)
-const btnPrint = document.getElementById('btn-print');
-if (btnPrint) {
-    btnPrint.addEventListener('click', () => {
-        const result = buildPdfDocument();
-        if (result) {
-            // Demande au PDF de lancer directement l'impression à l'ouverture
-            result.doc.autoPrint();
-            // Ouvre le PDF dans un nouvel onglet, prêt à être imprimé !
-            window.open(result.doc.output('bloburl'), '_blank');
+        const startStr = document.getElementById('date-debut').value;
+        const endStr = document.getElementById('date-fin').value;
+
+        function getBadgeHtml(type) {
+            if (type === 'pret') return `<span style="background:#eff6ff; color:#2563eb; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">PRÊT</span>`;
+            if (type === 'retour') return `<span style="background:#ecfdf5; color:#10b981; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">RETOUR</span>`;
+            if (type === 'don') return `<span style="background:#fffbeb; color:#d97706; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">DON</span>`;
+            if (type === 'ajout') return `<span style="background:#faf5ff; color:#9333ea; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 11px;">STOCK</span>`;
+            return '';
         }
+
+        let trs = "";
+        if (currentAllEvents.length === 0) {
+            trs = `<tr><td colspan="4" style="padding: 15px; text-align: center; color: #94a3b8;">Aucune opération sur cette période.</td></tr>`;
+        } else {
+            trs = currentAllEvents.map(ev => {
+                const dateStr = ev.date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                return `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="width: 15%; padding: 12px 6px; color: #475569; vertical-align: top;">${dateStr}</td>
+                        <td style="width: 12%; padding: 12px 6px; vertical-align: top;">${getBadgeHtml(ev.type)}</td>
+                        <td style="width: 35%; padding: 12px 6px; font-weight: bold; color: #1e293b; vertical-align: top; word-break: break-word; white-space: normal;">${ev.titre}</td>
+                        <td style="width: 38%; padding: 12px 6px; color: #64748b; line-height: 1.5; vertical-align: top; word-break: break-word; white-space: normal;">${ev.desc.replace(' | ', '<br>')}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        const htmlString = `
+        <div id="pdf-export-layer" style="width: 794px; background: white; padding: 30px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
+            
+            <div style="border-bottom: 2px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px;">
+                <h1 style="color: #1e293b; font-size: 26px; margin: 0;">La Lumière de l'Ange Zeïna</h1>
+                <h2 style="color: #64748b; font-size: 18px; margin: 6px 0 0 0;">Rapport d'activité détaillé</h2>
+                <p style="color: #94a3b8; font-size: 14px; margin: 6px 0 0 0;">Période du <strong>${startStr}</strong> au <strong>${endStr}</strong></p>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; gap: 15px; margin-bottom: 30px; width: 100%;">
+                <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #2563eb;">${currentStats.prets}</h3>
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Prêts</p>
+                </div>
+                <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #10b981;">${currentStats.retours}</h3>
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Retours</p>
+                </div>
+                <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #d97706;">${currentStats.dons}</h3>
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Dons</p>
+                </div>
+                <div style="flex: 1; background: #faf5ff; border: 1px solid #e9d5ff; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 24px; color: #9333ea;">${currentStats.ajouts}</h3>
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #475569; font-weight: bold; text-transform: uppercase;">Stock Reçu</p>
+                </div>
+            </div>
+
+            <h3 style="font-size: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px; color: #0f172a;">Journal des opérations</h3>
+            
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; table-layout: fixed;">
+                <thead>
+                    <tr style="background: #f8fafc;">
+                        <th style="width: 15%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Date</th>
+                        <th style="width: 12%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Action</th>
+                        <th style="width: 35%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Objet</th>
+                        <th style="width: 38%; padding: 10px 6px; border-bottom: 2px solid #cbd5e1; color: #475569;">Détails</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${trs}
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 30px; text-align: right; color: #94a3b8; font-size: 10px;">
+                Généré le ${new Date().toLocaleString('fr-FR')} par le système Zeïna.
+            </div>
+        </div>
+        `;
+
+        const pdfWrapper = document.createElement('div');
+        pdfWrapper.innerHTML = htmlString;
+        pdfWrapper.style.position = 'absolute';
+        pdfWrapper.style.top = '0';
+        pdfWrapper.style.left = '0';
+        pdfWrapper.style.width = '794px';
+        pdfWrapper.style.zIndex = '-10';
+
+        document.body.appendChild(pdfWrapper);
+
+        const opt = {
+            margin:       10,
+            filename:     `Zeina_Rapport_${startStr}_au_${endStr}.pdf`,
+            image:        { type: 'jpeg', quality: 1.0 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Génération...';
+        btn.disabled = true;
+
+        html2pdf().set(opt).from(pdfWrapper).save().then(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            document.body.removeChild(pdfWrapper);
+        }).catch(err => {
+            console.error("Erreur PDF:", err);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            document.body.removeChild(pdfWrapper);
+            alert("Erreur lors de la création du PDF.");
+        });
     });
 }
 

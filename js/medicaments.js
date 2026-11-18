@@ -15,18 +15,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ==========================================
-// SYSTÈME DE MISE À JOUR (SANS DÉCONNEXION)
-const APP_VERSION = "2.6";
-if (localStorage.getItem("zeina_version") !== APP_VERSION) {
-    if ('caches' in window) {
-        caches.keys().then(names => names.forEach(name => caches.delete(name)));
-    }
-    localStorage.setItem("zeina_version", APP_VERSION);
-    console.log("Mise à jour vers la version " + APP_VERSION);
-}
-// ==========================================
-
 onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = "index.html";
 });
@@ -177,6 +165,7 @@ async function verifierCodeBarre(code) {
             const qte = extractLots(medData).qteTotale;
             alert(`Médicament reconnu : "${medData.nom}" (Stock : ${qte} boîtes)`);
         } else {
+            document.getElementById('scanned-code-display').textContent = `Code-barres scanné : ${code}`;
             document.getElementById('scanned-med-name').value = "";
             document.getElementById('scanned-med-stock').value = 1;
             document.getElementById('scanned-med-exp').value = "";
@@ -331,6 +320,7 @@ function renderMeds() {
             }
 
             document.getElementById('give-med-name').textContent = nom;
+            document.getElementById('give-med-stock-info').textContent = `Total disponible : ${qteTotale} boîte(s)`;
             document.getElementById('give-quantity').value = 1;
             document.getElementById('give-beneficiary').value = "";
 

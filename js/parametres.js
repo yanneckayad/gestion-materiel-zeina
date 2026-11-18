@@ -13,18 +13,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// ==========================================
-// SYSTÈME DE MISE À JOUR (SANS DÉCONNEXION)
-const APP_VERSION = "2.6";
-if (localStorage.getItem("zeina_version") !== APP_VERSION) {
-    if ('caches' in window) {
-        caches.keys().then(names => names.forEach(name => caches.delete(name)));
-    }
-    localStorage.setItem("zeina_version", APP_VERSION);
-    console.log("Mise à jour vers la version " + APP_VERSION);
-}
-// ==========================================
-
 onAuthStateChanged(auth, (user) => {
     if (!user) {
         window.location.href = "index.html";
@@ -48,12 +36,10 @@ document.getElementById('btn-clear-cache').addEventListener('click', async () =>
         }
     }
 
-    localStorage.removeItem("zeina_version");
-
     setTimeout(() => {
-        alert("Cache nettoyé avec succès. L'application va se recharger.");
-        window.location.reload(true);
-    }, 1000);
+        alert("Cache nettoyé avec succès. La page va se recharger.");
+        window.location.reload();
+    }, 500);
 });
 
 const toggleAnimationsBtn = document.getElementById('toggle-animations');
